@@ -14,7 +14,7 @@ struct Surface {
     // xy: the mole's middle (x, z), z: its radius, w: how dark it is.
     mole: vec4<f32>,
     // x: how high the mole stands, y: how much is shown, z: how pale the
-    // mole has grown, w: unused.
+    // mole has grown, w: how far a melanoma has grown out of it, 0 to 1.
     shape: vec4<f32>,
     // xyz: towards the light, w: its strength.
     light: vec4<f32>,
@@ -108,16 +108,26 @@ fn mole_at(p: vec2<f32>) -> vec2<f32> {
     if r <= 1.0 {
         return vec2<f32>(0.0, 2.0);
     }
-    let d = p - surface.mole.xy;
+    let g = surface.shape.w;
+    // A melanoma grows unevenly: its middle drifts, its edge notches.
+    let d = p - surface.mole.xy - vec2<f32>(0.3, -0.15) * r * g;
     let a = atan2(d.y, d.x);
-    let wobble = 1.0 + 0.1 * (fbm(vec2<f32>(cos(a), sin(a)) * 2.5 + vec2<f32>(3.0, 7.0)) - 0.5);
+    let dir = vec2<f32>(cos(a), sin(a));
+    let lobes = 0.7 * noise(dir * 2.2 + vec2<f32>(3.0, 7.0)) + 0.3 * noise(dir * 4.5 + vec2<f32>(1.0, 2.0));
+    let wobble = 1.0 + (0.1 + 0.35 * g) * (lobes - 0.5) * 2.0;
     let rr = length(d) / (r * wobble);
     return vec2<f32>(1.0 - smoothstep(0.9, 1.01, rr), rr);
 }
 
 fn height(p: vec2<f32>) -> f32 {
     let m = mole_at(p);
-    let raised = surface.shape.x * max(1.0 - m.y * m.y, 0.0);
+    var raised = surface.shape.x * max(1.0 - m.y * m.y, 0.0);
+    // A melanoma's nodule, standing up out of it once it has grown down.
+    let g = surface.shape.w;
+    if g > 0.6 {
+        let nod = length(p - surface.mole.xy - vec2<f32>(0.25, 0.1) * surface.mole.z) / (0.28 * surface.mole.z);
+        raised = raised + 260.0 * (g - 0.6) / 0.4 * max(1.0 - nod * nod, 0.0);
+    }
     // A mole's skin is smoother than the skin around it.
     return relief(p) * (1.0 - 0.5 * m.x) + raised;
 }
@@ -159,6 +169,17 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         let brown = vec3<f32>(0.24, 0.11, 0.05);
         let tan = vec3<f32>(0.42, 0.24, 0.15);
         var mole = mix(brown, deep, (1.0 - m.y) * 0.5 + nests * 0.25);
+        // A melanoma's colours: black, blue-grey, red, and white where it
+        // regresses, in patches, more as it grows.
+        let g = surface.shape.w;
+        if g > 0.0 {
+            let blot = fbm(p / 650.0 + vec2<f32>(4.0, 1.0));
+            let other = fbm(p / 380.0 + vec2<f32>(9.0, 3.0));
+            mole = mix(mole, vec3<f32>(0.03, 0.018, 0.016), smoothstep(0.45, 0.7, blot) * g);
+            mole = mix(mole, vec3<f32>(0.14, 0.16, 0.22), smoothstep(0.58, 0.8, other) * g * 0.6);
+            mole = mix(mole, vec3<f32>(0.32, 0.1, 0.08), smoothstep(0.62, 0.82, 1.0 - blot) * g * 0.5);
+            mole = mix(mole, vec3<f32>(0.5, 0.42, 0.4), smoothstep(0.78, 0.9, other * blot * 2.0) * g * 0.5);
+        }
         // The pigment network a dermatoscope shows: the rete ridges, full
         // of pigment, a darker honeycomb thinning towards the edge.
         let ridges = voronoi(p / 110.0 + vec2<f32>(2.0, 9.0));

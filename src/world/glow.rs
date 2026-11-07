@@ -47,6 +47,9 @@ pub struct Glow {
     /// seconds of the renderer's clock.
     #[uniform(0)]
     pub emphasis: Vec4,
+    /// A hole in it: xyz its middle, w its radius, 0 for none.
+    #[uniform(0)]
+    pub hole: Vec4,
 }
 
 /// The camera's near plane as a fraction of its distance to its focus,
@@ -64,6 +67,7 @@ impl Glow {
             spot: Vec4::ZERO,
             band: Vec4::new(0.0, 0.0, 1e30, 1e30),
             emphasis: Vec4::new(1.0, 1.0, 0.0, 0.0),
+            hole: Vec4::ZERO,
         }
     }
 

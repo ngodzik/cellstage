@@ -103,11 +103,37 @@ impl Layer {
         }
     }
 
+    /// Every layer.
+    pub const ALL: [Layer; 17] = [
+        Layer::Horny,
+        Layer::Granular,
+        Layer::Spiny,
+        Layer::Basal,
+        Layer::Nucleus,
+        Layer::FadingNucleus,
+        Layer::Melanin,
+        Layer::Melanocyte,
+        Layer::First,
+        Layer::FirstNucleus,
+        Layer::Membrane,
+        Layer::Collagen,
+        Layer::Elastic,
+        Layer::Fibroblast,
+        Layer::Vessel,
+        Layer::RedCell,
+        Layer::Immune,
+    ];
+
     /// Every layer's name, once each.
     pub fn names() -> Vec<&'static str> {
-        let mut names: Vec<&'static str> = super::LAYERS.iter().map(|l| l.name()).collect();
+        let mut names: Vec<&'static str> = Self::ALL.iter().map(|l| l.name()).collect();
         names.dedup();
         names
+    }
+
+    /// The layer of that name.
+    pub fn named(name: &str) -> Option<Layer> {
+        Self::ALL.iter().copied().find(|l| l.name() == name)
     }
 
     /// Its name, as the agent points at it.
@@ -137,9 +163,7 @@ impl Layer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Solid {
     Ball,
-    Bead,
     Plate,
-    RedCell,
 }
 
 /// One cell, or part of one, placed.

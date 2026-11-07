@@ -1108,8 +1108,25 @@ fn image_search(args: &Value) -> Result<String, String> {
 /// the agent directs in it.
 fn show_world(world: &mut World, args: &Value) -> Result<String, String> {
     let name = text(args, "world").unwrap_or_else(|| "skin".to_owned());
-    let id = prepare(world, args, Kind::World, "Skin, cell by cell")?;
-    crate::world::show(world, &id, &name)?;
+    let variant = text(args, "variant").unwrap_or_default();
+    let about = crate::world::about(&name).ok_or_else(|| {
+        format!(
+            "no world {name}; there are {}",
+            crate::world::names().join(", ")
+        )
+    })?;
+    let variant = if variant.is_empty() {
+        about
+            .variants
+            .first()
+            .copied()
+            .unwrap_or_default()
+            .to_owned()
+    } else {
+        variant
+    };
+    let id = prepare(world, args, Kind::World, "A world")?;
+    crate::world::show(world, &id, &name, &variant)?;
     let mut worlds = world.resource_mut::<crate::world::Worlds>();
     let scene = worlds
         .map
@@ -1119,25 +1136,22 @@ fn show_world(world: &mut World, args: &Value) -> Result<String, String> {
     if let Some(place) = text(args, "place") {
         start = scene.place(&place).ok_or_else(|| {
             format!(
-                "no place {place}; there are {}",
-                scene
-                    .places()
-                    .iter()
-                    .map(|p| p.name)
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                "no place {place} in the {name}; there are {}",
+                about.places.join(", ")
             )
         })?;
         scene.eye = start;
     }
-    let years = number(args, "years").map_or(scene.years, |y| y as f32);
-    scene.years = years;
+    let clock = number(args, "clock")
+        .or(number(args, "years"))
+        .map_or(about.start, |y| y as f32);
+    scene.time = clock;
     scene.highlight = crate::world::film::names(args.get("highlight"));
     let shots = args.get("shots").and_then(Value::as_array);
     let film = match shots {
         Some(list) => {
             let shots = crate::world::film::read_shots(list, |n| scene.place(n), start)?;
-            crate::world::film::Film::new(shots, years)
+            crate::world::film::Film::new(shots, clock)
         }
         None => crate::world::film::Film::default(),
     };
@@ -1156,9 +1170,8 @@ fn show_world(world: &mut World, args: &Value) -> Result<String, String> {
         String::new()
     };
     Ok(format!(
-        "{film}The world {name} in panel {id}. Places: {places}. Notes can point at: {}, and the nearest of {}.",
-        crate::world::WorldScene::things().join(", "),
-        crate::world::skin::Layer::names().join(", ")
+        "{film}The world {name}, telling {variant}, in panel {id}. Places: {places}. Notes can point at: {}.",
+        (about.things)().join(", ")
     ))
 }
 
@@ -1216,15 +1229,9 @@ fn find_place(world: &World, panel: &str, on: &str) -> Result<String, String> {
         s.places.iter().map(|(n, _)| n.clone()).collect()
     } else if let Some(c) = views.cells.get(panel) {
         c.places.iter().map(|(n, _)| n.clone()).collect()
-    } else if world
-        .resource::<crate::world::Worlds>()
-        .map
-        .contains_key(panel)
-    {
-        crate::world::WorldScene::things()
-            .iter()
-            .copied()
-            .chain(crate::world::skin::Layer::names())
+    } else if let Some(scene) = world.resource::<crate::world::Worlds>().map.get(panel) {
+        (scene.about.things)()
+            .into_iter()
             .map(str::to_owned)
             .collect()
     } else {

@@ -29,6 +29,8 @@ struct Glow {
     // How much it stands out: from x to y, starting at the time z, over w
     // seconds.
     emphasis: vec4<f32>,
+    // A hole in it: xyz its middle, w its radius, 0 for none.
+    hole: vec4<f32>,
 }
 
 // How far `d` is from `lo` to `hi`, evenly in its logarithm, smoothed.
@@ -62,6 +64,16 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     if glow.band.z < 1e29 {
         shown = shown * (1.0 - ramp(f, glow.band.z, glow.band.w));
+    }
+    if glow.hole.w > 0.0 {
+        // Ragged, as a membrane digested away.
+        let rag = 1.0 + 0.25 * sin(p.x * 0.4 + sin(p.z * 0.3) * 2.0);
+        let from_hole = distance(p, glow.hole.xyz);
+        let r = glow.hole.w * rag;
+        shown = shown * smoothstep(r * 0.8, r, from_hole);
+        // The digested edge glows, seen from any side.
+        let off = (from_hole - r) / (0.14 * r);
+        c = c + glow.rim.rgb * 0.5 * exp(-off * off);
     }
     let e = glow.emphasis;
     let since = clamp((globals.time - e.z) / max(e.w, 0.001), 0.0, 1.0);

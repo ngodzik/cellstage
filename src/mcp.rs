@@ -478,20 +478,21 @@ fn tools() -> Value {
                 "type": "object",
                 "properties": {
                     "panel": {"type": "string"},
-                    "world": {"type": "string", "enum": world::NAMES, "default": "skin"},
-                    "place": {"type": "string", "enum": world::PLACES, "description": "Where the camera starts; by default where it was, or the skin."},
-                    "years": {"type": "number", "description": "The clock at the start; -1 (before the mutation) by default."},
-                    "highlight": {"type": "array", "items": {"type": "string", "enum": world::highlights()}, "description": "What to set apart when no film says otherwise."},
+                    "world": {"type": "string", "enum": world::names(), "default": "skin"},
+                    "variant": {"type": "string", "enum": world::all_variants(), "description": "Which story the world's clock tells; the first of the world's by default."},
+                    "place": {"type": "string", "enum": world::all_places(), "description": "Where the camera starts; by default where it was."},
+                    "clock": {"type": "number", "description": "The world's clock at the start; by default where the world's story begins."},
+                    "highlight": {"type": "array", "items": {"type": "string", "enum": world::all_highlights()}, "description": "What to set apart when no film says otherwise."},
                     "shots": {
                         "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "place": {"type": "string", "enum": world::PLACES},
+                                "place": {"type": "string", "enum": world::all_places()},
                                 "seconds": {"type": "number", "description": "How long the shot lasts, the camera's travel included; by default the travel and 4 s. Leave time to read what is said."},
                                 "say": {"type": "string", "description": "A subtitle over the shot: one or two short sentences."},
-                                "years": {"type": "number", "description": "The clock at the end of the shot; it runs there while the camera stays."},
-                                "highlight": {"type": "array", "items": {"type": "string", "enum": world::highlights()}, "description": "What to set apart; the rest dims. braf_codon_600 sets the mutated base pair apart in the helix."},
+                                "clock": {"type": "number", "description": "The world's clock at the end of the shot; it runs there while the camera stays."},
+                                "highlight": {"type": "array", "items": {"type": "string", "enum": world::all_highlights()}, "description": "What to set apart; the rest dims. braf_codon_600 sets the mutated base pair apart in the helix."},
                                 "distance": {"type": "number", "description": "Micrometres from what the place looks at, to come closer or stand back."},
                                 "turn": {"type": "number", "description": "Degrees to turn about what the place looks at."},
                                 "tilt": {"type": "number", "description": "Degrees above the horizontal to look from; negative looks from below."},

@@ -637,13 +637,7 @@ fn film_controls(ui: &mut egui::Ui, scene: &mut crate::world::WorldScene, conten
         );
         painter.galley(at, galley, egui::Color32::WHITE);
     }
-    if scene.film.shots.iter().any(|s| s.years.is_some()) && scene.years >= 0.0 {
-        let years = scene.years;
-        let label = if years < 1.0 {
-            format!("{:.0} months", years * 12.0)
-        } else {
-            format!("year {years:.1}")
-        };
+    if let Some(label) = scene.clock_label() {
         painter.text(
             content.right_top() + egui::vec2(-16.0, 14.0),
             egui::Align2::RIGHT_TOP,

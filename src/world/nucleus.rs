@@ -56,6 +56,17 @@ impl Base {
         }
     }
 
+    /// The base it most often mutates into: a transition, purine for
+    /// purine, pyrimidine for pyrimidine, as ultraviolet light's C to T.
+    pub fn transition(self) -> Self {
+        match self {
+            Base::C => Base::T,
+            Base::T => Base::C,
+            Base::G => Base::A,
+            Base::A => Base::G,
+        }
+    }
+
     /// Its colour, as the convention of many textbooks has it.
     pub fn colour(self) -> [f32; 3] {
         match self {

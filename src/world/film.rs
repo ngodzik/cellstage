@@ -61,8 +61,8 @@ pub struct Shot {
     pub travel: f32,
     /// What is said over it.
     pub say: String,
-    /// The world's clock, in years, at the end of the shot, if it moves.
-    pub years: Option<f32>,
+    /// The world's clock at the end of the shot, if it moves.
+    pub clock: Option<f32>,
     /// How fast the camera turns about its focus while it stays, in
     /// radians a second.
     pub drift: f32,
@@ -74,7 +74,7 @@ pub struct Shot {
 #[derive(Debug, Clone, Default)]
 pub struct Film {
     pub shots: Vec<Shot>,
-    pub start_years: f32,
+    pub start: f32,
     /// Where each shot leaves the camera.
     ends: Vec<Eye>,
 }
@@ -83,7 +83,7 @@ pub struct Film {
 #[derive(Debug, Clone)]
 pub struct Frame {
     pub eye: Eye,
-    pub years: f32,
+    pub clock: f32,
     /// What is said, and how visible the words are, 0 to 1.
     pub say: Option<(String, f32)>,
     /// What the shot sets apart.
@@ -157,8 +157,8 @@ pub fn travel_time(a: &Eye, b: &Eye) -> f32 {
 }
 
 impl Film {
-    /// A film of `shots`, the clock at `years` when it starts.
-    pub fn new(shots: Vec<Shot>, years: f32) -> Self {
+    /// A film of `shots`, the world's clock at `clock` when it starts.
+    pub fn new(shots: Vec<Shot>, clock: f32) -> Self {
         let ends = shots
             .iter()
             .map(|shot| {
@@ -170,7 +170,7 @@ impl Film {
             .collect();
         Self {
             shots,
-            start_years: years,
+            start: clock,
             ends,
         }
     }
@@ -183,7 +183,7 @@ impl Film {
     pub fn frame(&self, clock: f32, from: &Eye) -> Frame {
         let mut start = 0.0;
         let mut previous = *from;
-        let mut years = self.start_years;
+        let mut years = self.start;
         for (i, shot) in self.shots.iter().enumerate() {
             let end = start + shot.seconds;
             if clock < end || i + 1 == self.shots.len() {
@@ -196,7 +196,7 @@ impl Film {
                     e.yaw += shot.drift * (local - travel);
                     e
                 };
-                let years = match shot.years {
+                let years = match shot.clock {
                     Some(to) => {
                         let span = (shot.seconds - travel).max(1e-3);
                         let f = ((local - travel) / span).clamp(0.0, 1.0);
@@ -211,12 +211,12 @@ impl Film {
                 });
                 return Frame {
                     eye,
-                    years,
+                    clock: years,
                     say,
                     highlight: shot.highlight.clone(),
                 };
             }
-            if let Some(to) = shot.years {
+            if let Some(to) = shot.clock {
                 years = to;
             }
             previous = self.ends[i];
@@ -224,7 +224,7 @@ impl Film {
         }
         Frame {
             eye: *from,
-            years,
+            clock: years,
             say: None,
             highlight: Vec::new(),
         }
@@ -289,7 +289,7 @@ pub fn read_shots(
                 .and_then(Value::as_str)
                 .unwrap_or_default()
                 .to_owned(),
-            years: number("years"),
+            clock: number("clock").or(number("years")),
             drift: number("drift").unwrap_or(3.0).to_radians(),
             highlight: names(s.get("highlight")),
         });
@@ -338,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn a_film_runs_its_clock_during_the_shot_that_asks_for_it() {
+    fn a_film_runs_the_worlds_clock_during_the_shot_that_asks_for_it() {
         let a = eye(Vec3::ZERO, 100.0);
         let shots = vec![
             Shot {
@@ -346,7 +346,7 @@ mod tests {
                 seconds: 4.0,
                 travel: 0.0,
                 say: "one".into(),
-                years: None,
+                clock: None,
                 drift: 0.0,
                 highlight: Vec::new(),
             },
@@ -355,18 +355,18 @@ mod tests {
                 seconds: 10.0,
                 travel: 2.0,
                 say: String::new(),
-                years: Some(8.0),
+                clock: Some(8.0),
                 drift: 0.0,
                 highlight: Vec::new(),
             },
         ];
         let film = Film::new(shots, -1.0);
         assert_eq!(film.length(), 14.0);
-        assert_eq!(film.frame(1.0, &a).years, -1.0);
+        assert_eq!(film.frame(1.0, &a).clock, -1.0);
         assert!(film.frame(1.0, &a).say.is_some());
-        assert_eq!(film.frame(5.0, &a).years, -1.0);
+        assert_eq!(film.frame(5.0, &a).clock, -1.0);
         let late = film.frame(14.0, &a);
-        assert!((late.years - 8.0).abs() < 1e-4);
+        assert!((late.clock - 8.0).abs() < 1e-4);
         assert!((late.eye.distance - 50.0).abs() < 1e-3);
     }
 }
