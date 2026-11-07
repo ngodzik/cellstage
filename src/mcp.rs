@@ -144,7 +144,7 @@ fn send(message: &Value) {
 
 /// What the agent is told when it connects.
 const INSTRUCTIONS: &str = "\
-cellstage is a window beside this conversation where you tell the user biology as a story in pictures, step by step, and the user moves through the steps with the arrow keys, turning, zooming and clicking what is shown. Anything in the body can be shown, at every scale: the body and its organs, tissues, cells, molecules, the embryo, microbes; pathways and lineages; numbers; real pictures.
+cellstage is a window beside this conversation where you tell the user biology as a story in pictures, step by step, and the user moves through the steps with the arrow keys, turning, zooming and clicking what is shown. Anything in the body can be shown, at every scale: the body and its organs, tissues, cells, molecules, the embryo, microbes; pathways and lineages; numbers. The window makes everything it shows itself: it shows no pictures from anywhere else. When what the user asks is in none of the worlds and none of the tools below, say plainly that cellstage cannot show it yet; do not look for pictures elsewhere, and do not fetch or make them by other means.
 
 What you can put in a panel:
 - show_world: a world built in three dimensions ahead of time, cell by cell, that you film rather than draw. You direct: shots, each a place the camera flies to across scales, the words said over it as subtitles, how far the world's clock runs meanwhile, what stands out; the window renders it as a film, with life moving all the while. This is far richer than anything drawn: whenever the subject is in a world, film it there, in one large panel, and draw only what no world shows. The worlds: skin, from a forearm down to the DNA of one melanocyte, whose clock tells a common mole or a melanoma; growth_signals, a cell reading a growth factor from its surface to its genes; cell_death, a cell dying by apoptosis or escaping it; telomeres, chromosomes and the ends that wear down with each division. Together they show Hanahan and Weinberg's hallmarks of cancer.
@@ -152,7 +152,6 @@ What you can put in a panel:
 - show_diagram: a pathway, a lineage, a cascade, a cycle, a sequence of events, as nodes and edges; the window lays it out. Nodes can be house shapes, for a lineage of cells.
 - show_chart: numbers as lines, areas, bars or points, always with where they come from.
 - show_text: a page of words, headings, lists, a definition set apart, for a course's summary or vocabulary.
-- show_image: a real picture from Wikimedia Commons, a micrograph, a scan, an old anatomical plate; image_search finds them with their licence, and the panel credits the author.
 - show_protein: a protein at its measured structure (Protein Data Bank), or the AlphaFold prediction for any human protein by its UniProt accession; protein_search finds both from a name. pathway_lookup reads Reactome, to draw a pathway from what is known.
 - show_cell: one cell whose protein network cellweave runs live; show_skin: stained sections of skin, normal or with a melanocytic lesion.
 
@@ -162,7 +161,7 @@ How to work:
 3. Everything you show is kept in the step on screen as you go. Every answer ends with where you are, [story, step k of n]. If the user moved to another step, your calls change that step.
 4. To show something changing (the neural tube closing, cells migrating, a heart beating, a tumour growing), give draw changes: each further frame as what changes from the one before, {id: {attribute: value}}; the window moves smoothly between them. A drawing, diagram or chart that comes back in the next step with numbers changed also moves into it. Name a drawing worth reusing, so it is kept in the library.
 5. annotate with on=<part> to point at a named part of a drawing, a template, a diagram's node, a section, a cell or a world (the answers list them), or chain and residue on a protein: the window places the note itself. Avoid coordinates and avoid checking with screenshot after every call; one screenshot when a new layout is done is enough.
-6. Every panel is labelled by what it is: a measured structure, a predicted structure, a simulation, an illustration or schematic, a chart of numbers you gave, a picture with its author and licence. Never present an illustration as a measurement or a simulation result, and never make up numbers for a chart without saying so in its source.
+6. Every panel is labelled by what it is: a measured structure, a predicted structure, a simulation, an illustration or schematic, a chart of numbers you gave. Never present an illustration as a measurement or a simulation result, and never make up numbers for a chart without saying so in its source.
 7. get_user_events tells you what the user clicked and which step they moved to. Call it when they refer to something in the window.
 The story carries the pictures and the short words; the teaching, the longer explanations and any revision are yours, in the conversation.";
 
@@ -375,25 +374,6 @@ fn tools() -> Value {
                     "size": {"type": "number", "default": 30, "description": "Font size of the body text."}
                 },
                 "required": ["panel", "text"]
-            }
-        },
-        {
-            "name": "image_search",
-            "description": "Search Wikimedia Commons for pictures: micrographs, histology, scans, photographs, old anatomical plates (Gray's Anatomy is in the public domain), diagrams. Each result comes with its size, licence and author. Search in English.",
-            "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "limit": {"type": "integer", "default": 8}}, "required": ["query"]}
-        },
-        {
-            "name": "show_image",
-            "description": "Show a picture from Wikimedia Commons in a panel, fetched once and kept in the user's cache, with its author and licence on the panel. Point at things in it with annotate arrow_to=[x, y] as fractions of the picture, or draw over it with draw and <image href=\"commons:File:...\">.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "panel": {"type": "string"},
-                    "file": {"type": "string", "description": "The file's name on Commons, such as File:Melanoma.jpg, as image_search gives it."},
-                    "title": {"type": "string"},
-                    "caption": {"type": "string"}
-                },
-                "required": ["panel", "file"]
             }
         },
         {

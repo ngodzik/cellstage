@@ -805,8 +805,7 @@ pub fn kit() -> String {
 - <along shape=\"receptor\" d=\"M...\" n=\"6\"/> (or spacing; offset moves them off the path; face=\"none\" keeps them upright): shapes along a path, turned with it.\n\
 - <bilayer d=\"M...\" thickness=\"22\"/>: a lipid bilayer along any path, its outside on the left of the path's direction, up for a path drawn left to right.\n\
 - <helix d=\"M...\" width=\"36\" turn=\"68\"/>: a double helix of DNA along any path.\n\
-A shorthand's shape is a house shape, or a <symbol id> your drawing defines.\n\
-\nPictures: <image href=\"commons:File:Name.jpg\" x=\"0\" y=\"0\" width=\"800\" height=\"600\"/> puts a picture from Wikimedia Commons (image_search finds them) in a drawing, to draw over it.\n",
+A shorthand's shape is a house shape, or a <symbol id> your drawing defines.\n",
     );
     out.push_str(
         "\nMarkers for your own paths: marker-end=\"url(#h-arrow)\", url(#h-arrow-red), url(#h-bar). Gradients you may fill with: url(#h-cyto), url(#h-nucleus), url(#h-crest), url(#h-ectoderm), url(#h-mesoderm), url(#h-endoderm) and the others named h-<class>.\n\nTwo rules of SVG that surprise: a class's style wins over attributes such as fill=\"...\" or stroke=\"...\" on the same element, so to change a class's colour write style=\"fill:...\"; and a gradient or a filter (the house classes use them) on a perfectly straight horizontal or vertical line draws nothing, so bend such a line a little or give it a plain colour.\n\nParts: give an id to everything you will point at or the user may click, such as id=\"neural_crest\"; annotate with on=\"neural_crest\" puts a note on it, and a click on it tells you its id. Say what a part is with data-what=\"...\" on it, or in parts.\n\nMoving: the quickest is changes, each further frame given as what changes from the one before: [{\"crest_1\": {\"transform\": \"translate(420 380)\"}, \"tube\": {\"d\": \"M ...\"}}, ...]; a transform or an opacity may be new (the frames before are given one that does nothing), other attributes should be in the first frame already, with the same kind of value (a path with the same commands). Or give frames, the same drawing with numbers changed (positions, sizes, rotations, colours, opacities), the same elements in the same order, the same path commands; the window moves smoothly from one to the next. Something that appears is in every frame, with opacity 0 before. Frames that differ otherwise fade into each other.",
@@ -1444,6 +1443,12 @@ fn render_one(svg: &str, canvas: &Canvas) -> Result<(Vec<u8>, Vec<Part>), String
     let options = usvg::Options {
         fontdb: fonts(),
         font_family: "Noto Sans".to_owned(),
+        // The window draws everything it shows: no picture is read, from a
+        // file or from the drawing itself.
+        image_href_resolver: usvg::ImageHrefResolver {
+            resolve_data: Box::new(|_, _, _| None),
+            resolve_string: Box::new(|_, _| None),
+        },
         ..usvg::Options::default()
     };
     let tree =

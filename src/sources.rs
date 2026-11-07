@@ -1,21 +1,12 @@
 //! What the window looks up on the web for the agent, each from a source
 //! whose terms allow it, and kept in the user's cache, never in the
-//! project: pictures from Wikimedia Commons, proteins from UniProt, the
-//! Protein Data Bank and the AlphaFold database, pathways from Reactome.
-
-use std::path::PathBuf;
+//! project: proteins from UniProt, the Protein Data Bank and the AlphaFold
+//! database, pathways from Reactome.
 
 use serde_json::Value;
 
-/// Who is asking, as Wikimedia asks every program to say.
+/// Who is asking, as every service asks a program to say.
 const AGENT: &str = "cellstage/0.1 (a local window for learning biology)";
-
-fn cache(kind: &str) -> PathBuf {
-    crate::protein::cache()
-        .parent()
-        .map_or_else(std::env::temp_dir, PathBuf::from)
-        .join(kind)
-}
 
 /// Text made safe for a URL's query.
 fn encode(s: &str) -> String {
@@ -114,165 +105,6 @@ fn short(text: &str, most: usize) -> String {
     }
     let cut: String = text.chars().take(most).collect();
     format!("{}…", cut.trim_end())
-}
-
-/// A picture from Wikimedia Commons, with who made it and under which
-/// licence; `path` is where it is kept, once fetched.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Picture {
-    pub title: String,
-    pub width: u32,
-    pub height: u32,
-    pub author: String,
-    pub licence: String,
-    pub description: String,
-    pub page: String,
-    pub url: String,
-    #[serde(default)]
-    pub path: PathBuf,
-}
-
-fn picture(page: &Value) -> Option<Picture> {
-    let info = page.get("imageinfo")?.get(0)?;
-    let meta = info.get("extmetadata")?;
-    let field = |k: &str| {
-        meta.get(k)
-            .and_then(|m| m.get("value"))
-            .and_then(Value::as_str)
-            .map(plain)
-            .unwrap_or_default()
-    };
-    let mime = info.get("thumbmime").or(info.get("mime"))?.as_str()?;
-    let url = info.get("thumburl").or(info.get("url"))?.as_str()?;
-    // Only what the renderer reads.
-    let readable = ["image/png", "image/jpeg", "image/gif", "image/webp"].contains(&mime)
-        || url.split('?').next().is_some_and(|u| {
-            [".png", ".jpg", ".jpeg", ".gif", ".webp"]
-                .iter()
-                .any(|e| u.to_lowercase().ends_with(e))
-        });
-    if !readable {
-        return None;
-    }
-    Some(Picture {
-        title: page.get("title")?.as_str()?.to_owned(),
-        width: info.get("thumbwidth").or(info.get("width"))?.as_u64()? as u32,
-        height: info.get("thumbheight").or(info.get("height"))?.as_u64()? as u32,
-        author: field("Artist"),
-        licence: field("LicenseShortName"),
-        description: short(&field("ImageDescription"), 300),
-        page: info
-            .get("descriptionurl")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_owned(),
-        url: url.to_owned(),
-        path: PathBuf::new(),
-    })
-}
-
-const COMMONS: &str = "https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=imageinfo&iiprop=url|size|mime|extmetadata&iiurlwidth=1600&iiextmetadatafilter=LicenseShortName|Artist|ImageDescription";
-
-/// Pictures on Wikimedia Commons that match a search: photographs,
-/// micrographs, old anatomical plates, drawings, each with its licence.
-pub fn commons_search(query: &str, limit: usize) -> Result<Vec<Picture>, String> {
-    let url = format!(
-        "{COMMONS}&generator=search&gsrnamespace=6&gsrlimit={}&gsrsearch={}",
-        limit.clamp(1, 20),
-        encode(&format!("filetype:bitmap|drawing {query}"))
-    );
-    let answer = get_json(&url)?;
-    let mut found: Vec<(i64, Picture)> = answer
-        .get("query")
-        .and_then(|q| q.get("pages"))
-        .and_then(Value::as_object)
-        .into_iter()
-        .flatten()
-        .filter_map(|(_, page)| {
-            let index = page.get("index").and_then(Value::as_i64).unwrap_or(0);
-            picture(page).map(|p| (index, p))
-        })
-        .collect();
-    found.sort_by_key(|(i, _)| *i);
-    Ok(found.into_iter().map(|(_, p)| p).collect())
-}
-
-/// A picture from Commons by its file name, fetched once and kept.
-pub fn commons_picture(title: &str) -> Result<Picture, String> {
-    let title = title.trim();
-    let title = if title.starts_with("File:") {
-        title.to_owned()
-    } else {
-        format!("File:{title}")
-    };
-    let safe: String = title[5..]
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == '.' || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .take(120)
-        .collect();
-    let dir = cache("commons");
-    let sidecar = dir.join(format!("{safe}.json"));
-    if let Some(p) = std::fs::read_to_string(&sidecar)
-        .ok()
-        .and_then(|t| serde_json::from_str::<Picture>(&t).ok())
-        .filter(|p| p.path.exists())
-    {
-        return Ok(p);
-    }
-    let answer = get_json(&format!("{COMMONS}&titles={}", encode(&title)))?;
-    let page = answer
-        .get("query")
-        .and_then(|q| q.get("pages"))
-        .and_then(Value::as_object)
-        .and_then(|m| m.values().next())
-        .ok_or("Commons did not answer")?;
-    if page.get("missing").is_some() {
-        return Err(format!(
-            "Commons has no {title}; image_search finds file names"
-        ));
-    }
-    let mut p =
-        picture(page).ok_or_else(|| format!("{title} is not a picture this window reads"))?;
-    let bytes = get_bytes(&p.url).map_err(|e| format!("fetching {title}: {e}"))?;
-    let ext = p
-        .url
-        .split('?')
-        .next()
-        .and_then(|u| u.rsplit('.').next())
-        .unwrap_or("png")
-        .to_lowercase();
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    p.path = dir.join(format!("{safe}.{ext}"));
-    std::fs::write(&p.path, &bytes).map_err(|e| e.to_string())?;
-    if let Ok(text) = serde_json::to_string(&p) {
-        let _ = std::fs::write(&sidecar, text);
-    }
-    Ok(p)
-}
-
-/// A drawing whose `<image href="commons:File:...">` are made to point
-/// at the pictures, fetched.
-pub fn resolve_commons(svg: &str) -> Result<String, String> {
-    let mut out = String::with_capacity(svg.len());
-    let mut rest = svg;
-    while let Some(at) = rest.find("\"commons:") {
-        out.push_str(&rest[..at + 1]);
-        let after = &rest[at + 9..];
-        let end = after.find('"').ok_or("an href that does not close")?;
-        let picture = commons_picture(&after[..end])?;
-        out.push_str(&crate::drawing::text::escape(
-            &picture.path.to_string_lossy(),
-        ));
-        rest = &after[end..];
-    }
-    out.push_str(rest);
-    Ok(out)
 }
 
 /// Proteins that match a name, a gene, or a subject: human entries of

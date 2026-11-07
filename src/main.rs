@@ -6,17 +6,18 @@
 //! keys. Each step splits the window into panels and shows in them
 //! drawings the agent writes in SVG, from a house of shapes and templates
 //! with named parts, which move from one frame to the next; diagrams and
-//! charts the window lays out; pages of words; pictures from Wikimedia
-//! Commons; proteins at their measured atomic structure or as AlphaFold
-//! predicts them; a cell under a fluorescence microscope whose network
-//! cellweave runs live; stained tissue sections drawn from histology. Every
+//! charts the window lays out; pages of words; proteins at their measured
+//! atomic structure or as AlphaFold predicts them; a cell under a
+//! fluorescence microscope whose network cellweave runs live; stained
+//! tissue sections drawn from histology; worlds built in three dimensions
+//! that the agent films. The window makes everything it shows: it fetches
+//! no pictures from anywhere. Every
 //! story is kept in a library on disk, to be told again at once. The user
 //! turns and zooms what is shown, clicks on it, and the agent hears what
 //! was clicked.
 //!
 //! Every panel says what it is: a measured or a predicted structure, a
-//! simulation, an illustration, a chart of numbers given, a picture and
-//! its author.
+//! simulation, an illustration, a chart of numbers given.
 
 #![deny(unsafe_code)]
 // The tools' descriptions are one long json! literal.

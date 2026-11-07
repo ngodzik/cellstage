@@ -109,7 +109,6 @@ pub fn handle(world: &mut World, tool: &str, args: &Value, mode: Mode) -> Result
         "story_remove_step" => story_remove_step(world, args),
         "story_open" => story_open(world, args),
         "library_search" => Ok(library_search(args)),
-        "image_search" => image_search(args),
         "protein_search" => sources::proteins(&text(args, "query").ok_or("search for what?")?),
         "pathway_lookup" => sources::reactome(
             &text(args, "query")
@@ -142,7 +141,6 @@ pub fn handle(world: &mut World, tool: &str, args: &Value, mode: Mode) -> Result
                 "show_diagram" => show_diagram(world, &args),
                 "show_chart" => show_chart(world, &args),
                 "show_text" => show_text(world, &args),
-                "show_image" => show_image(world, &args),
                 "show_world" => show_world(world, &args),
                 "annotate" => annotate(world, &args),
                 "clear_annotations" => {
@@ -833,16 +831,18 @@ fn draw(world: &mut World, args: &Value) -> Result<String, String> {
         .and_then(Value::as_array)
         .and_then(|a| Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32)));
     let size = Sheet::read(&inputs[0], size).size;
-    // Shorthands written out and pictures fetched first, so that changes
-    // may name what they made.
+    if inputs
+        .iter()
+        .any(|i| i.contains("<image") || i.contains("<feImage"))
+    {
+        return Err("a drawing takes no pictures: the window draws everything it shows. Draw it with shapes and templates, or tell the user cellstage cannot show it".to_owned());
+    }
+    // Shorthands written out first, so that changes may name what they
+    // made.
     let mut inputs: Vec<String> = inputs
         .iter()
         .enumerate()
-        .map(|(k, i)| {
-            drawing::macros::expand(i, size)
-                .and_then(|s: String| sources::resolve_commons(&s))
-                .map_err(|e| format!("frame {}: {e}", k + 1))
-        })
+        .map(|(k, i)| drawing::macros::expand(i, size).map_err(|e| format!("frame {}: {e}", k + 1)))
         .collect::<Result<_, _>>()?;
     // Frames given by what changes from the frame before.
     if let Some(list) = args.get("changes").and_then(Value::as_array) {
@@ -1043,67 +1043,6 @@ fn show_text(world: &mut World, args: &Value) -> Result<String, String> {
     )
 }
 
-fn show_image(world: &mut World, args: &Value) -> Result<String, String> {
-    let file = text(args, "file").ok_or("which file? image_search finds them")?;
-    let p = sources::commons_picture(&file)?;
-    let (w, h) = (p.width as f32, p.height as f32);
-    let svg = format!(
-        "<svg viewBox=\"0 0 {w} {h}\"><image id=\"picture\" href=\"{}\" x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\"/></svg>",
-        drawing::text::escape(&p.path.to_string_lossy())
-    );
-    let mut how = Labelled {
-        label: Some("PICTURE · Wikimedia Commons".to_owned()),
-        source: Some(format!("{}, {}", short_credit(&p.author), p.licence)),
-        title: "A picture",
-        name_parts: false,
-        ..Labelled::drawing()
-    };
-    how.described = vec![("picture".to_owned(), p.description.clone())];
-    let answer = stage_drawing(world, args, vec![svg], (w, h), how)?;
-    Ok(format!(
-        "{answer} {}: {} By {}, {}. Point at things in it with annotate arrow_to=[x, y] as fractions of the picture, or draw over it with draw and <image href=\"commons:{}\" width=\"{w}\" height=\"{h}\"/>.",
-        p.title, p.description, p.author, p.licence, p.title
-    ))
-}
-
-/// An author's credit short enough for a panel's label.
-fn short_credit(author: &str) -> String {
-    let a = author.trim();
-    if a.chars().count() > 60 {
-        format!("{}…", a.chars().take(58).collect::<String>())
-    } else if a.is_empty() {
-        "author unknown".to_owned()
-    } else {
-        a.to_owned()
-    }
-}
-
-fn image_search(args: &Value) -> Result<String, String> {
-    let query = text(args, "query").ok_or("search for what?")?;
-    let limit = number(args, "limit").unwrap_or(8.0) as usize;
-    let found = sources::commons_search(&query, limit)?;
-    if found.is_empty() {
-        return Ok(format!(
-            "Nothing on Wikimedia Commons for {query}; try other words, in English."
-        ));
-    }
-    let mut out = String::from(
-        "On Wikimedia Commons (show_image file=... shows one; its licence and author are shown with it):\n",
-    );
-    for p in found {
-        out.push_str(&format!(
-            "- {} ({} by {} px; {}; by {}): {}\n",
-            p.title,
-            p.width,
-            p.height,
-            p.licence,
-            short_credit(&p.author),
-            p.description
-        ));
-    }
-    Ok(out)
-}
-
 /// Open a world in a panel, or keep the one it shows, and play the film
 /// the agent directs in it.
 fn show_world(world: &mut World, args: &Value) -> Result<String, String> {
@@ -1289,7 +1228,7 @@ fn now() -> u64 {
 }
 
 /// The calls that fill a panel.
-const SHOWS: [&str; 9] = [
+const SHOWS: [&str; 8] = [
     "show_protein",
     "show_world",
     "show_skin",
@@ -1298,17 +1237,10 @@ const SHOWS: [&str; 9] = [
     "show_diagram",
     "show_chart",
     "show_text",
-    "show_image",
 ];
 
 /// The calls whose panel is a drawing, which can move into one another.
-const DRAWN: [&str; 5] = [
-    "draw",
-    "show_diagram",
-    "show_chart",
-    "show_text",
-    "show_image",
-];
+const DRAWN: [&str; 4] = ["draw", "show_diagram", "show_chart", "show_text"];
 
 /// Keep a call in the step on screen: its panels as the stage now has
 /// them, and what the call put in its panel.

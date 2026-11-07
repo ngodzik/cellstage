@@ -18,12 +18,11 @@ cellstage is a [Model Context Protocol](https://modelcontextprotocol.io) server 
 - **diagrams** the window lays out from nodes and edges: a signalling pathway, a cell lineage drawn with the house's cells, a feedback loop, a sequence of events;
 - **charts** of numbers the agent gives, as lines, areas, bars or points, each with where its numbers come from;
 - **pages of words**: headings, lists, a definition set apart, for a summary or the words to remember;
-- **pictures from Wikimedia Commons**, micrographs, scans, old anatomical plates, found by subject and shown with their author and licence;
 - **proteins** at the atomic structure their authors measured, any entry of the Protein Data Bank, or as the AlphaFold database predicts any human protein, as atoms or as their fold, with residues highlighted, notes pinned to residues as the protein turns, and a slider between two states of the same protein;
 - **one cell under a fluorescence microscope**, its protein network run live by [cellweave](../cellweave): oxygen, growth factor and stress set by the agent, genes removed or stuck on, each stained protein glowing where it lives, the cell cycling, arresting, taking itself apart or bursting by cellweave's thresholds;
 - **stained sections of skin**, normal or with a melanocytic lesion at one of ten stages, from a junctional nevus to a nodular melanoma, drawn in haematoxylin and eosin from the criteria histology uses to tell them apart.
 
-The agent points at things by name, a part of its drawing or of a template, a node of a diagram, a place in a section or a cell, a residue, and the window places the note beside it and follows it as it moves. It can look things up as it tells: proteins in UniProt and the PDB, pathways in Reactome, pictures on Commons. The user turns and zooms what is shown and clicks on things; the agent hears what was clicked, and which step the user went to. The teaching is the agent's: cellstage only shows.
+The agent points at things by name, a part of its drawing or of a template, a node of a diagram, a place in a section or a cell, a residue, and the window places the note beside it and follows it as it moves. It can look things up as it tells: proteins in UniProt and the PDB, pathways in Reactome. The window makes everything it shows: it shows no pictures from anywhere else, and a drawing takes none. When a subject is in none of its worlds and none of its tools, the agent is told to say that cellstage cannot show it yet. The user turns and zooms what is shown and clicks on things; the agent hears what was clicked, and which step the user went to. The teaching is the agent's: cellstage only shows.
 
 ## The library
 
@@ -39,7 +38,6 @@ Every panel carries a label, so that a drawing is never taken for a measurement 
 - **illustration** or **schematic**: a world built from what histology describes, a section drawn from it, a drawing or a diagram of the agent's; none is simulated. A world's mole grows along the course the textbooks describe, laid out ahead of time, not computed.
 - **chart**: numbers the agent gave, with the source it named.
 - **text**: words the agent wrote.
-- **picture**: a file from Wikimedia Commons, with its author and licence.
 
 ## Running it
 
@@ -73,7 +71,6 @@ Then, in a new Claude Code session, ask for something to be shown or explained. 
 | `show_diagram` | a pathway, a lineage or a sequence of events, laid out from nodes and edges |
 | `show_chart` | lines, areas, bars or points from numbers given with their source |
 | `show_text` | a page of words, in a little Markdown |
-| `image_search`, `show_image` | pictures on Wikimedia Commons, found and shown with their author and licence |
 | `protein_search` | human proteins in UniProt with what each does, and structures in the PDB, from a name |
 | `pathway_lookup` | pathways and reactions in Reactome, with their steps, inputs and outputs |
 | `show_protein` | a PDB entry, or the AlphaFold prediction for a UniProt accession, in a panel; its answer lists chains, residue numbers and bound molecules |
@@ -91,8 +88,7 @@ No structure, picture or record from elsewhere is stored in the project. What th
 - structures from the RCSB; the wwPDB places the archive's files under CC0;
 - predicted structures from the [AlphaFold database](https://alphafold.ebi.ac.uk), under CC BY 4.0;
 - what proteins do, from [UniProt](https://www.uniprot.org), under CC BY 4.0;
-- pathways from [Reactome](https://reactome.org), under CC BY 4.0;
-- pictures from [Wikimedia Commons](https://commons.wikimedia.org), each under its own free licence, which the panel shows with its author.
+- pathways from [Reactome](https://reactome.org), under CC BY 4.0.
 
 The house shapes, colours and templates are drawn for this project. Drawings are rendered with [resvg](https://github.com/linebender/resvg) (Apache-2.0 or MIT).
 
