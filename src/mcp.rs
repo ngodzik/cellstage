@@ -59,8 +59,9 @@ pub enum Message {
 const VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
 /// Read messages from standard input until it closes, answering each, and
-/// handing tool calls to the window through `window`.
-pub fn serve(window: Sender<Message>) {
+/// handing tool calls to the window through `window`, then calling `wake`
+/// for the window may be asleep.
+pub fn serve(window: Sender<Message>, wake: impl Fn()) {
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
         let Ok(line) = line else { break };
@@ -112,6 +113,7 @@ pub fn serve(window: Sender<Message>) {
                 {
                     break;
                 }
+                wake();
                 let reply = answer
                     .recv_timeout(Duration::from_secs(180))
                     .unwrap_or_else(|_| Reply::error("the window did not answer in time"));
@@ -131,6 +133,7 @@ pub fn serve(window: Sender<Message>) {
         }
     }
     let _ = window.send(Message::Quit);
+    wake();
 }
 
 fn send(message: &Value) {

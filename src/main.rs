@@ -38,6 +38,7 @@ mod world;
 
 use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, Sender, channel};
+use std::time::Duration;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::CameraOutputMode;
@@ -46,6 +47,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{BlendState, Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
 use bevy::window::{ExitCondition, PrimaryWindow, WindowCloseRequested};
+use bevy::winit::{EventLoopProxyWrapper, UpdateMode, WinitSettings, WinitUserEvent};
 use bevy_egui::{EguiGlobalSettings, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext};
 
 use crate::cell::specimen::{self, Channel};
@@ -65,50 +67,60 @@ const DYES: [[f32; 3]; 3] = [specimen::GREEN, specimen::RED, specimen::MAGENTA];
 
 fn main() -> anyhow::Result<()> {
     let (to_window, inbox) = channel();
-    std::thread::spawn(move || mcp::serve(to_window));
     drawing::warm();
     world::warm();
-    App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "cellstage".to_owned(),
-                resolution: (1600, 960).into(),
-                // Shown when the agent first draws, not when it connects.
-                visible: false,
-                ..default()
-            }),
-            exit_condition: ExitCondition::DontExit,
-            close_when_requested: false,
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: "cellstage".to_owned(),
+            resolution: (1600, 960).into(),
+            // Shown when the agent first draws, not when it connects.
+            visible: false,
             ..default()
-        }))
-        .add_plugins(EguiPlugin::default())
-        .add_plugins((world::glow::GlowPlugin, world::surface::SurfacePlugin))
-        .insert_resource(ClearColor(scene::BACKGROUND))
-        .insert_resource(Inbox(Mutex::new(inbox)))
-        .insert_resource(Stage::default())
-        .insert_resource(Scenes::default())
-        .insert_resource(world::Worlds::default())
-        .insert_resource(Views::default())
-        .insert_resource(GlobalAmbientLight {
-            color: Color::srgb(0.75, 0.8, 1.0),
-            brightness: 120.0,
-            ..default()
-        })
-        .add_systems(Startup, setup)
-        .add_systems(
-            Update,
-            (
-                bridge,
-                live_cells,
-                render_drawings,
-                scene::place,
-                world::run,
-                hide_on_close,
-            )
-                .chain(),
+        }),
+        exit_condition: ExitCondition::DontExit,
+        close_when_requested: false,
+        ..default()
+    }))
+    .add_plugins(EguiPlugin::default())
+    .add_plugins((world::glow::GlowPlugin, world::surface::SurfacePlugin))
+    // Hidden until the agent first draws, so asleep until then.
+    .insert_resource(asleep())
+    .insert_resource(ClearColor(scene::BACKGROUND))
+    .insert_resource(Inbox(Mutex::new(inbox)))
+    .insert_resource(Stage::default())
+    .insert_resource(Scenes::default())
+    .insert_resource(world::Worlds::default())
+    .insert_resource(Views::default())
+    .insert_resource(GlobalAmbientLight {
+        color: Color::srgb(0.75, 0.8, 1.0),
+        brightness: 120.0,
+        ..default()
+    })
+    .add_systems(Startup, setup)
+    .add_systems(
+        Update,
+        (
+            bridge,
+            live_cells,
+            render_drawings,
+            scene::place,
+            world::run,
+            hide_on_close,
+            pace,
         )
-        .add_systems(EguiPrimaryContextPass, chrome::chrome)
-        .run();
+            .chain(),
+    )
+    .add_systems(EguiPrimaryContextPass, chrome::chrome);
+    // The loop sleeps while the window is hidden: each message from the
+    // agent wakes it.
+    let proxy = (*app.world().resource::<EventLoopProxyWrapper>()).clone();
+    std::thread::spawn(move || {
+        mcp::serve(to_window, move || {
+            let _ = proxy.send_event(WinitUserEvent::WakeUp);
+        })
+    });
+    app.run();
     Ok(())
 }
 
@@ -159,6 +171,32 @@ fn hide_on_close(
     {
         window.visible = false;
         stage.shown = false;
+    }
+}
+
+/// Run the loop flat out while the window is shown, and sleep while it is
+/// hidden: drawing a window nobody sees, as fast as the loop turns, kept
+/// whole cores busy for nothing.
+fn pace(stage: Res<Stage>, mut settings: ResMut<WinitSettings>) {
+    let wanted = if stage.shown {
+        WinitSettings::game()
+    } else {
+        asleep()
+    };
+    if settings.focused_mode != wanted.focused_mode
+        || settings.unfocused_mode != wanted.unfocused_mode
+    {
+        *settings = wanted;
+    }
+}
+
+/// Wait for an event, however long: a message from the agent, or the
+/// window shown again.
+fn asleep() -> WinitSettings {
+    let wait = UpdateMode::reactive_low_power(Duration::MAX);
+    WinitSettings {
+        focused_mode: wait,
+        unfocused_mode: wait,
     }
 }
 
