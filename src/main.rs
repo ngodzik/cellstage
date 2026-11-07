@@ -4,24 +4,32 @@
 //! output, and a window. An agent connected to it, in a terminal or any
 //! client, tells a story in steps the user moves through with the arrow
 //! keys. Each step splits the window into panels and shows in them
-//! proteins at their measured atomic structure, a cell under a
-//! fluorescence microscope whose network cellweave runs live, stained
-//! tissue sections drawn from histology, and drawings the agent writes in
-//! SVG, which move from one frame to the next. Every story is kept in a
-//! library on disk, to be told again at once. The user turns and zooms what
-//! is shown, clicks on it, and the agent hears what was clicked.
+//! drawings the agent writes in SVG, from a house of shapes and templates
+//! with named parts, which move from one frame to the next; diagrams and
+//! charts the window lays out; pages of words; pictures from Wikimedia
+//! Commons; proteins at their measured atomic structure or as AlphaFold
+//! predicts them; a cell under a fluorescence microscope whose network
+//! cellweave runs live; stained tissue sections drawn from histology. Every
+//! story is kept in a library on disk, to be told again at once. The user
+//! turns and zooms what is shown, clicks on it, and the agent hears what
+//! was clicked.
 //!
-//! Every panel says what it is: a measured structure, a simulation, or an
-//! illustration.
+//! Every panel says what it is: a measured or a predicted structure, a
+//! simulation, an illustration, a chart of numbers given, a picture and
+//! its author.
 
 #![deny(unsafe_code)]
+// The tools' descriptions are one long json! literal.
+#![recursion_limit = "512"]
 
 mod cell;
 mod chrome;
 mod drawing;
+mod figure;
 mod mcp;
 mod protein;
 mod scene;
+mod sources;
 mod stage;
 mod story;
 mod tissue;
@@ -165,16 +173,53 @@ fn bridge(world: &mut World) {
             Message::Call(call) => match call.tool.as_str() {
                 "screenshot" => screenshot(world, call.reply),
                 "drawing_kit" => {
-                    let mut reply = Reply::text(drawing::kit());
-                    if call
-                        .args
-                        .get("picture")
-                        .and_then(serde_json::Value::as_bool)
-                        == Some(true)
-                    {
-                        match tools::kit_picture().and_then(|(rgba, w, h)| {
-                            encode(&rgba, w, h, 4).map_err(|e| e.to_string())
-                        }) {
+                    let args = &call.args;
+                    let picture =
+                        args.get("picture").and_then(serde_json::Value::as_bool) == Some(true);
+                    let template = args.get("template").and_then(serde_json::Value::as_str);
+                    let page = args
+                        .get("page")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(1) as usize;
+                    let (text, sheet) = match template {
+                        Some(name) => match drawing::templates::find(name) {
+                            Some(t) => (
+                                tools::template_parts(t),
+                                if picture {
+                                    Some(drawing::template_sheet(name))
+                                } else {
+                                    None
+                                },
+                            ),
+                            None => (
+                                format!(
+                                    "No template {name}; there are {}.",
+                                    drawing::templates::names().join(", ")
+                                ),
+                                None,
+                            ),
+                        },
+                        None => {
+                            let mut text = drawing::kit();
+                            text.push_str(&format!(
+                                "\n\nThe kit's picture has {} pages: picture with page 1 to {} for the shapes, page {} for the colours.",
+                                drawing::kit_pages(),
+                                drawing::kit_pages() - 1,
+                                drawing::kit_pages()
+                            ));
+                            let sheet = picture.then(|| {
+                                drawing::kit_sheet(page).ok_or_else(|| format!("no page {page}"))
+                            });
+                            (text, sheet)
+                        }
+                    };
+                    let mut reply = Reply::text(text);
+                    if let Some(sheet) = sheet {
+                        match sheet.and_then(|s| drawing::picture_of(&s, 1100)).and_then(
+                            |(rgba, w, h): (Vec<u8>, u32, u32)| {
+                                encode(&rgba, w, h, 4).map_err(|e| e.to_string())
+                            },
+                        ) {
                             Ok(png) => reply.image = Some(png),
                             Err(e) => reply.text.push_str(&format!("\n(no picture: {e})")),
                         }
@@ -427,6 +472,16 @@ fn render_drawings(
         }
         let content = panel.content();
         let image_rect = stage::image_rect(content, view.size, panel.zoom, panel.pan);
+        let position = view.film.position(view.clock);
+        // A drawing on the move is rendered at half the pixels, which the
+        // eye does not see, and sharp again once it stands still.
+        let last = view.film.frames().len().saturating_sub(1) as f32;
+        let moving = position.fract() > 0.002 && position < last;
+        let ppp = if moving && content.area() * ppp * ppp > 250_000.0 {
+            ppp * 0.5
+        } else {
+            ppp
+        };
         let (w, h) = (
             (content.width() * ppp).round().max(1.0) as u32,
             (content.height() * ppp).round().max(1.0) as u32,
@@ -441,7 +496,6 @@ fn render_drawings(
             ),
             background: view.background,
         };
-        let position = view.film.position(view.clock);
         if view.last == Some((position, canvas)) {
             continue;
         }

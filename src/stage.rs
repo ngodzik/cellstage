@@ -107,6 +107,9 @@ pub struct Panel {
     /// A line under the label: which entry, which stage, which setting.
     pub source: String,
     pub kind: Kind,
+    /// A label said more exactly than the kind's: a chart, a page, a
+    /// picture, a predicted structure.
+    pub label: Option<String>,
     pub notes: Vec<Note>,
     /// The call whose result it shows, to know whether a step needs it
     /// made again.
@@ -130,6 +133,7 @@ impl Panel {
             caption: String::new(),
             source: String::new(),
             kind: Kind::Empty,
+            label: None,
             notes: Vec::new(),
             shown: None,
             rect: egui::Rect::NOTHING,
@@ -287,10 +291,11 @@ pub fn frame(painter: &egui::Painter, panel: &Panel, solid: bool) {
         egui::FontId::proportional(17.0),
         egui::Color32::from_rgb(232, 234, 240),
     );
+    let kind = panel.label.as_deref().unwrap_or(panel.kind.label());
     let label = if panel.source.is_empty() {
-        panel.kind.label().to_owned()
+        kind.to_owned()
     } else {
-        format!("{} · {}", panel.kind.label(), panel.source)
+        format!("{kind} · {}", panel.source)
     };
     painter.text(
         r.left_top() + egui::vec2(10.0, 30.0),

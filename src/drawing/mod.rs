@@ -9,9 +9,14 @@
 //! drawing with numbers changed, positions, sizes, colours, opacities; when
 //! they are not, one fades into the other.
 
+use std::collections::BTreeSet;
 use std::sync::{Arc, OnceLock};
 
 use resvg::{tiny_skia, usvg};
+
+pub mod macros;
+pub mod templates;
+pub mod text;
 
 /// What a class looks like.
 const HOUSE_CSS: &str = include_str!("house.css");
@@ -23,7 +28,7 @@ pub const DEFAULT_SIZE: (f32, f32) = (1600.0, 1000.0);
 
 /// The ready-made shapes: id, size, what it is, and how much larger the
 /// kit's picture draws it.
-pub const SHAPES: [(&str, &str, &str, f32); 26] = [
+pub const SHAPES: [(&str, &str, &str, f32); 120] = [
     (
         "cell",
         "100 across",
@@ -155,10 +160,557 @@ pub const SHAPES: [(&str, &str, &str, f32); 26] = [
         "a fat cell: one big droplet, its nucleus pressed to the side",
         1.6,
     ),
+    // Organelles
+    (
+        "rough-er",
+        "94 by 50",
+        "rough endoplasmic reticulum: stacked sacs studded with ribosomes",
+        1.8,
+    ),
+    (
+        "smooth-er",
+        "90 by 44",
+        "smooth endoplasmic reticulum: a net of tubes, no ribosomes",
+        1.8,
+    ),
+    (
+        "golgi",
+        "90 by 62",
+        "the Golgi apparatus: curved stacked cisternae, vesicles budding off",
+        1.9,
+    ),
+    (
+        "lysosome",
+        "30 across",
+        "a lysosome, full of digestive enzymes and what it breaks down",
+        4.0,
+    ),
+    (
+        "peroxisome",
+        "26 across",
+        "a peroxisome, its crystalline core",
+        4.6,
+    ),
+    (
+        "ribosome",
+        "18 by 16",
+        "a ribosome: large and small subunits",
+        6.0,
+    ),
+    (
+        "centrosome",
+        "56 by 44",
+        "a centrosome: two centrioles at right angles in their cloud",
+        2.7,
+    ),
+    ("vesicle", "20 across", "a vesicle carrying its cargo", 6.0),
+    (
+        "endosome",
+        "62 by 40",
+        "an endosome, small vesicles inside it, a tubule leaving",
+        2.5,
+    ),
+    (
+        "proteasome",
+        "28 by 62, upright",
+        "a proteasome: the barrel that cuts tagged proteins into pieces",
+        1.9,
+    ),
+    (
+        "cilium",
+        "44 by 104, membrane at y 0, pointing up",
+        "a cilium on its basal body",
+        0.78,
+    ),
+    (
+        "microvilli",
+        "100 by 38, membrane at y 0, pointing up",
+        "microvilli: a row of fingers that widens a cell's surface",
+        1.7,
+    ),
+    (
+        "microtubule",
+        "200 by 24",
+        "a microtubule: a hollow tube of tubulin pairs",
+        0.85,
+    ),
+    (
+        "actin-filament",
+        "200 by 12",
+        "an actin filament: two strands of beads wound round each other",
+        0.85,
+    ),
+    (
+        "intermediate-filament",
+        "200 by 10",
+        "an intermediate filament: a rope of twisted proteins, such as keratin",
+        0.85,
+    ),
+    // Blood and immune cells
+    (
+        "t-cell",
+        "36 across, with its receptors",
+        "a T lymphocyte, its receptors on the surface",
+        3.3,
+    ),
+    (
+        "b-cell",
+        "38 across, with its receptors",
+        "a B lymphocyte, antibodies on its surface as receptors",
+        3.2,
+    ),
+    (
+        "plasma-cell",
+        "42 by 30",
+        "a plasma cell, making antibodies: off-centre nucleus, pale halo beside it",
+        4.0,
+    ),
+    (
+        "nk-cell",
+        "36 across",
+        "a natural killer cell, its granules ready",
+        3.3,
+    ),
+    (
+        "dendritic-cell",
+        "128 by 124",
+        "a dendritic cell, its long veils sampling what is around",
+        0.97,
+    ),
+    (
+        "mast-cell",
+        "46 by 40",
+        "a mast cell, packed with granules of histamine",
+        3.0,
+    ),
+    (
+        "eosinophil",
+        "36 across",
+        "an eosinophil: two-lobed nucleus, orange-red granules",
+        3.3,
+    ),
+    (
+        "basophil",
+        "34 across",
+        "a basophil, dark granules over its nucleus",
+        3.5,
+    ),
+    (
+        "megakaryocyte",
+        "150 by 124",
+        "a megakaryocyte: a giant cell with a lobed nucleus, shedding platelets",
+        0.97,
+    ),
+    (
+        "stem-cell",
+        "48 across with its glow",
+        "a stem cell: small, round, most of it nucleus; here of the blood",
+        2.5,
+    ),
+    // Cells of tissues
+    (
+        "hepatocyte",
+        "70 by 64",
+        "a liver cell: many-sided, often two nuclei, glycogen and mitochondria",
+        1.8,
+    ),
+    (
+        "cardiomyocyte",
+        "150 by 46",
+        "a heart muscle cell: striated, branched, one central nucleus, intercalated discs at its ends",
+        1.1,
+    ),
+    (
+        "skeletal-muscle-fibre",
+        "220 by 40",
+        "a skeletal muscle fibre: striated, its many nuclei along its edge",
+        0.77,
+    ),
+    (
+        "smooth-muscle-cell",
+        "120 by 22",
+        "a smooth muscle cell: a spindle, a long central nucleus, no stripes",
+        1.4,
+    ),
+    (
+        "endothelial-cell",
+        "130 by 18, lumen side up",
+        "an endothelial cell, flat, lining a vessel, its nucleus bulging",
+        1.3,
+    ),
+    (
+        "osteoblast",
+        "54 by 46, bone below",
+        "an osteoblast, laying down new bone matrix beneath it",
+        2.7,
+    ),
+    (
+        "osteocyte",
+        "100 by 56",
+        "an osteocyte, walled in bone in its lacuna, reaching out through canaliculi",
+        1.7,
+    ),
+    (
+        "osteoclast",
+        "140 by 86",
+        "an osteoclast: a giant cell with many nuclei, its ruffled border digging into bone",
+        1.2,
+    ),
+    (
+        "chondrocyte",
+        "64 by 56",
+        "chondrocytes, a pair in their lacunae within cartilage",
+        2.1,
+    ),
+    (
+        "goblet-cell",
+        "38 by 62, tiles with #epithelial-cell",
+        "a goblet cell, its cup full of mucus",
+        1.9,
+    ),
+    (
+        "squamous-cell",
+        "110 by 20",
+        "a squamous cell, flattened, seen from the side; stack them",
+        1.5,
+    ),
+    (
+        "beta-cell",
+        "54 across",
+        "a beta cell of a pancreatic islet, full of insulin granules",
+        2.3,
+    ),
+    (
+        "podocyte",
+        "130 by 72, basement membrane along its lower edge",
+        "a podocyte of the kidney filter: body, arms, and the interlocking feet on the basement membrane",
+        1.3,
+    ),
+    (
+        "alveolar-cell",
+        "48 by 42",
+        "a type II alveolar cell, its lamellar bodies holding surfactant",
+        2.9,
+    ),
+    // The nervous system
+    (
+        "astrocyte",
+        "140 by 132",
+        "an astrocyte: a star of processes, one ending in a foot on a vessel",
+        0.91,
+    ),
+    (
+        "oligodendrocyte",
+        "170 by 90",
+        "an oligodendrocyte, wrapping several axons in myelin",
+        1.0,
+    ),
+    (
+        "microglia",
+        "110 by 100",
+        "a microglial cell, the brain's own immune cell, its fine branches searching",
+        1.2,
+    ),
+    (
+        "schwann-cell",
+        "64 by 66, in cross-section",
+        "a Schwann cell wrapped round an axon, its myelin a spiral",
+        1.8,
+    ),
+    (
+        "synapse",
+        "84 by 104, the sending side above",
+        "a chemical synapse: vesicles of transmitter, the cleft, receptors on the other side",
+        1.2,
+    ),
+    (
+        "rod-cell",
+        "20 by 172, outer segment up",
+        "a rod of the retina: its outer segment a stack of discs for dim light",
+        0.7,
+    ),
+    (
+        "cone-cell",
+        "24 by 140, outer segment up",
+        "a cone of the retina: its tapering outer segment for colour and daylight",
+        0.88,
+    ),
+    (
+        "pyramidal-neuron",
+        "124 by 280, apical dendrite up",
+        "a pyramidal neuron of the cortex: triangular body, a long apical dendrite, the axon going down",
+        0.43,
+    ),
+    // Reproduction and the first days
+    (
+        "sperm",
+        "156 by 18, head to the right",
+        "a sperm cell, swimming right",
+        1.1,
+    ),
+    (
+        "oocyte",
+        "144 across, with its zona and corona",
+        "an egg cell: the zona pellucida round it, the corona of follicle cells outside",
+        0.83,
+    ),
+    (
+        "zygote",
+        "112 across",
+        "a fertilised egg: two pronuclei, two polar bodies, inside the zona",
+        1.1,
+    ),
+    (
+        "two-cell",
+        "112 across",
+        "an embryo of two cells, inside the zona",
+        1.1,
+    ),
+    (
+        "morula",
+        "112 across",
+        "a morula: a ball of some sixteen cells, inside the zona",
+        1.1,
+    ),
+    (
+        "blastocyst",
+        "124 across",
+        "a blastocyst: the trophectoderm round a cavity, the inner cell mass that becomes the embryo",
+        0.97,
+    ),
+    // Molecules
+    (
+        "protein",
+        "44 by 38",
+        "a protein, folded into a globule",
+        3.2,
+    ),
+    (
+        "enzyme",
+        "50 by 42, active site open at the top",
+        "an enzyme, its active site a pocket where its substrate fits",
+        2.8,
+    ),
+    (
+        "kinase",
+        "48 by 54",
+        "a kinase: two lobes, ATP in the cleft between them, ready to put a phosphate on a protein",
+        2.2,
+    ),
+    (
+        "phosphate",
+        "16 across",
+        "a phosphate group, the tag a kinase adds",
+        6.0,
+    ),
+    (
+        "atp",
+        "84 by 26, its three phosphates to the right",
+        "ATP, the cell's energy currency: adenine, ribose, three phosphates",
+        2.0,
+    ),
+    (
+        "gpcr",
+        "84 by 70, crosses a membrane 40 thick at y 0 (#lipid-bilayer), outside up",
+        "a G-protein-coupled receptor: seven helices across the membrane",
+        1.7,
+    ),
+    (
+        "ion-channel",
+        "52 by 56, open; crosses a membrane 40 thick at y 0",
+        "an ion channel, open: a pore ions pass through",
+        2.3,
+    ),
+    (
+        "ion-channel-closed",
+        "52 by 62, closed; crosses a membrane 40 thick at y 0",
+        "an ion channel, closed: its gate shut, an ion waiting",
+        2.1,
+    ),
+    (
+        "pump",
+        "60 by 72, outside up; crosses a membrane 40 thick at y 0",
+        "a pump, spending ATP to push ions against their gradient",
+        1.8,
+    ),
+    (
+        "transporter",
+        "56 by 52, open to the outside; crosses a membrane 40 thick at y 0",
+        "a transporter, open to the outside, its substrate in the cleft",
+        2.4,
+    ),
+    (
+        "g-protein",
+        "64 by 52, its anchors reach 24 above its centre",
+        "a G protein: alpha, beta and gamma subunits under the membrane",
+        2.7,
+    ),
+    (
+        "ligand",
+        "16 across",
+        "a ligand, the small molecule that binds a receptor",
+        6.0,
+    ),
+    (
+        "hormone",
+        "46 by 22",
+        "a steroid hormone: four fused rings",
+        3.6,
+    ),
+    (
+        "mhc",
+        "46 by 94, outside up; membrane 40 thick at y 0",
+        "an MHC class I molecule, a peptide shown in its groove",
+        1.1,
+    ),
+    (
+        "tcr",
+        "36 by 84, outside up; membrane 40 thick at y 0",
+        "a T-cell receptor, alpha and beta chains; turn it with rotate(180) to face an MHC",
+        1.2,
+    ),
+    (
+        "nucleosome",
+        "76 by 36",
+        "a nucleosome: DNA wound almost twice round a spool of eight histones",
+        2.2,
+    ),
+    (
+        "chromosome",
+        "44 by 96",
+        "a chromosome as it divides: two sister chromatids joined at the centromere",
+        1.2,
+    ),
+    (
+        "mrna",
+        "200 by 22, 5' cap at the left, poly-A tail at the right",
+        "a messenger RNA: its bases, the cap, the tail",
+        0.84,
+    ),
+    (
+        "trna",
+        "50 by 74, its amino acid on top, anticodon at the bottom",
+        "a transfer RNA: amino acid on one end, anticodon on the other",
+        1.6,
+    ),
+    (
+        "ribosome-translating",
+        "130 by 92",
+        "a ribosome reading an mRNA, its new protein coming out on top",
+        1.3,
+    ),
+    (
+        "lipid-bilayer",
+        "200 by 40, centred on y 0; tile it side by side",
+        "a stretch of membrane: two layers of phospholipids, heads out, tails in",
+        0.85,
+    ),
+    (
+        "phospholipid",
+        "18 by 48, head up",
+        "a phospholipid: a water-loving head, two fatty tails",
+        2.5,
+    ),
+    (
+        "cholesterol",
+        "12 by 30, head up",
+        "cholesterol, which sits among the lipids and stiffens a membrane",
+        4.0,
+    ),
+    ("glucose", "24 across", "a glucose molecule, the ring", 5.0),
+    ("oxygen", "26 by 15", "an oxygen molecule, O2", 6.0),
+    ("water", "26 by 20", "a water molecule", 6.0),
+    (
+        "ion",
+        "12 across",
+        "an ion, positive; sodium or potassium",
+        6.0,
+    ),
+    ("calcium", "15 across", "a calcium ion", 6.0),
+    (
+        "collagen-fibre",
+        "220 by 14",
+        "a collagen fibre: three chains wound together",
+        0.77,
+    ),
+    (
+        "myosin",
+        "130 by 36, its two heads to the right",
+        "a myosin motor: two heads that walk along actin, a long tail",
+        1.3,
+    ),
+    (
+        "actin-myosin",
+        "240 by 72",
+        "a sarcomere: thin actin filaments from the Z lines, thick myosin filaments between them",
+        0.71,
+    ),
+    // Microbes
+    (
+        "coronavirus",
+        "70 across",
+        "a coronavirus: its envelope crowned with spikes",
+        1.7,
+    ),
+    (
+        "bacteriophage",
+        "52 by 100, head up",
+        "a bacteriophage, the virus of bacteria: head of DNA, tail, legs",
+        1.2,
+    ),
+    (
+        "retrovirus",
+        "62 across",
+        "an enveloped retrovirus, such as HIV: its cone-shaped capsid holding two RNA strands",
+        1.9,
+    ),
+    (
+        "coccus",
+        "46 by 40",
+        "round bacteria, cocci, in a cluster",
+        3.0,
+    ),
+    (
+        "spirochete",
+        "170 by 16",
+        "a spirochete, a corkscrew bacterium",
+        1.0,
+    ),
+    (
+        "yeast",
+        "62 by 38, budding",
+        "a yeast cell, budding a daughter",
+        3.0,
+    ),
+    (
+        "fungal-hyphae",
+        "180 by 92",
+        "fungal hyphae: branching filaments with cross-walls, spores at a tip",
+        0.92,
+    ),
+    (
+        "plasmodium",
+        "24 across",
+        "a red blood cell holding a ring-stage malaria parasite",
+        5.0,
+    ),
+    // Tumours and clots
+    (
+        "tumour-cluster",
+        "120 by 112",
+        "a clump of tumour cells, irregular, crowded, large nuclei",
+        1.2,
+    ),
+    (
+        "fibrin",
+        "130 by 90",
+        "a fibrin net, a clot holding red cells",
+        1.3,
+    ),
 ];
 
 /// The house classes, by what they are for.
-pub const CLASSES: [(&str, &str); 10] = [
+pub const CLASSES: [(&str, &str); 17] = [
     (
         "text",
         "label (24px), title (34px bold), small (18px), light (white), muted (grey)",
@@ -196,6 +748,34 @@ pub const CLASSES: [(&str, &str); 10] = [
         "protein, receptor, ligand, dna-strand, dna-strand-2, dna-rung, antibody",
     ),
     ("microbes", "virus, bacterium"),
+    (
+        "organelles",
+        "rough-er (pale blue sacs), ribosome-dot, ser and ser-edge (stroke both for smooth ER tubes), golgi-stack, peroxisome, peroxisome-core, ribosome-large, ribosome-small, centriole, endosome, proteasome-core, proteasome-cap, cilium (a finger of membrane), tubulin-a, tubulin-b, actin-bead",
+    ),
+    (
+        "blood and immune cells",
+        "t-cell (green tint), b-cell (yellow tint), nk-cell (pink), plasma (blue cytoplasm), dendritic, mast, megakaryocyte, stem-cell",
+    ),
+    (
+        "cells of tissues",
+        "hepatocyte, cardio and skeletal (fine striations), disc (intercalated disc line), smooth-muscle, endothelial, osteoblast, osteoid, osteocyte, canaliculus, osteoclast, territorial (cartilage around chondrocytes), chondro, mucus, beta-cell, podocyte",
+    ),
+    (
+        "nervous system",
+        "astrocyte, oligo, microglia, schwann, postsynaptic, syn-vesicle, photoreceptor, photoreceptor-outer",
+    ),
+    (
+        "eggs and embryos",
+        "ooplasm, blastomere, icm (inner cell mass), sperm-head, acrosome, flagellum",
+    ),
+    (
+        "molecules, further",
+        "enzyme, kinase, kinase-c, phosphate, adenine, ribose, gpcr, gpcr-loop, channel, pump, transporter, g-alpha, g-beta, g-gamma, hormone, mhc, b2m, peptide (red), tcr-a, tcr-b, histone, dna-wrap, chromatid, rna (a teal strand), rna-cap, trna, lipid-head, lipid-tail, cholesterol, glucose, atom-o, atom-h, ion, calcium, myosin",
+    ),
+    (
+        "microbes, further",
+        "envelope (a viral envelope), capsid, phage, coccus, yeast, tumour-nucleus",
+    ),
 ];
 
 /// The kit in words, for the agent.
@@ -210,8 +790,26 @@ pub fn kit() -> String {
     for (id, size, what, _) in SHAPES {
         out.push_str(&format!("- #{id} ({size}): {what}\n"));
     }
+    out.push_str("\nTemplates, whole things with their parts named, set in a drawing with <insert name=\"heart\" x=\"800\" y=\"500\" width=\"700\"/>: x, y is where its centre goes (the middle when not given); width, height or scale sizes it; rotate turns it; flip=\"x\" mirrors it; prefix=\"a\" renames its parts a_left_ventricle and so on, for two of the same in one drawing; hide=\"id id\" makes parts transparent, to bring in later with changes; highlight=\"id id\" rings parts in yellow. Point at its parts with annotate on=; recolour one with <style>#left_ventricle { fill: #c33 }</style>, or with a change of its style. Draw your own elements around it, before it (behind) or after it (in front). drawing_kit with template=\"heart\" lists its parts and, with picture, shows where they are.\n");
+    for t in templates::all() {
+        out.push_str(&format!(
+            "- {} ({} by {}): {}\n",
+            t.name, t.view[2], t.view[3], t.what
+        ));
+    }
     out.push_str(
-        "\nMarkers for your own paths: marker-end=\"url(#h-arrow)\", url(#h-arrow-red), url(#h-bar). Gradients you may fill with: url(#h-cyto), url(#h-nucleus), url(#h-crest), url(#h-ectoderm), url(#h-mesoderm), url(#h-endoderm) and the others named h-<class>.\n\nTwo rules of SVG that surprise: a class's style wins over attributes such as fill=\"...\" or stroke=\"...\" on the same element, so to change a class's colour write style=\"fill:...\"; and a gradient or a filter (the house classes use them) on a perfectly straight horizontal or vertical line draws nothing, so bend such a line a little or give it a plain colour.\n\nParts: give an id to everything you will point at or the user may click, such as id=\"neural_crest\"; annotate with on=\"neural_crest\" puts a note on it, and a click on it tells you its id. Describe ids in parts to say more than the id.\n\nMoving: the quickest is changes, each further frame given as what changes from the one before: [{\"crest_1\": {\"transform\": \"translate(420 380)\"}, \"tube\": {\"d\": \"M ...\"}}, ...]; change attributes the first frame already has. Or give frames, the same drawing with numbers changed (positions, sizes, rotations, colours, opacities), the same elements in the same order, the same path commands; the window moves smoothly from one to the next. Something that appears is in every frame, with opacity 0 before. Frames that differ otherwise fade into each other.",
+        "\nShorthands, written out by the window, each into a group that keeps the id, class and style you give it:\n\
+- <scatter shape=\"rbc\" n=\"40\" x=\"100\" y=\"100\" width=\"600\" height=\"300\"/>, or over cx cy r, or inside a closed path d: shapes strewn without overlapping, as in a smear or a tissue; shapes=\"rbc rbc rbc neutrophil platelet\" mixes them as often as each is named; scale=\"0.8 1.2\" and rotate=\"0 360\" are ranges; gap=\"0.8\" lets them touch; seed changes the throw.\n\
+- <ring shape=\"epithelial-cell\" cx=\"400\" cy=\"300\" r=\"120\" face=\"in\"/>: shapes round a circle (or rx ry), their tops turned to the centre (in) or away (out); n is chosen to fill it when not given.\n\
+- <row shape n x y dx dy/> and <grid shape cols rows x y dx dy stagger=\"true\" jitter=\"0.2\"/>: lines and sheets of shapes, an epithelium, a muscle.\n\
+- <along shape=\"receptor\" d=\"M...\" n=\"6\"/> (or spacing; offset moves them off the path; face=\"none\" keeps them upright): shapes along a path, turned with it.\n\
+- <bilayer d=\"M...\" thickness=\"22\"/>: a lipid bilayer along any path, its outside on the left of the path's direction, up for a path drawn left to right.\n\
+- <helix d=\"M...\" width=\"36\" turn=\"68\"/>: a double helix of DNA along any path.\n\
+A shorthand's shape is a house shape, or a <symbol id> your drawing defines.\n\
+\nPictures: <image href=\"commons:File:Name.jpg\" x=\"0\" y=\"0\" width=\"800\" height=\"600\"/> puts a picture from Wikimedia Commons (image_search finds them) in a drawing, to draw over it.\n",
+    );
+    out.push_str(
+        "\nMarkers for your own paths: marker-end=\"url(#h-arrow)\", url(#h-arrow-red), url(#h-bar). Gradients you may fill with: url(#h-cyto), url(#h-nucleus), url(#h-crest), url(#h-ectoderm), url(#h-mesoderm), url(#h-endoderm) and the others named h-<class>.\n\nTwo rules of SVG that surprise: a class's style wins over attributes such as fill=\"...\" or stroke=\"...\" on the same element, so to change a class's colour write style=\"fill:...\"; and a gradient or a filter (the house classes use them) on a perfectly straight horizontal or vertical line draws nothing, so bend such a line a little or give it a plain colour.\n\nParts: give an id to everything you will point at or the user may click, such as id=\"neural_crest\"; annotate with on=\"neural_crest\" puts a note on it, and a click on it tells you its id. Say what a part is with data-what=\"...\" on it, or in parts.\n\nMoving: the quickest is changes, each further frame given as what changes from the one before: [{\"crest_1\": {\"transform\": \"translate(420 380)\"}, \"tube\": {\"d\": \"M ...\"}}, ...]; a transform or an opacity may be new (the frames before are given one that does nothing), other attributes should be in the first frame already, with the same kind of value (a path with the same commands). Or give frames, the same drawing with numbers changed (positions, sizes, rotations, colours, opacities), the same elements in the same order, the same path commands; the window moves smoothly from one to the next. Something that appears is in every frame, with opacity 0 before. Frames that differ otherwise fade into each other.",
     );
     out
 }
@@ -281,20 +879,164 @@ impl Sheet {
                 }
             }
         }
-        Self {
-            size,
-            body: hex_to_rgb(&body),
+        let house = house();
+        let defined = own_ids(&body);
+        let (body, _) = rename(&hex_to_rgb(&body), &house.names, &defined);
+        Self { size, body }
+    }
+
+    /// The house shapes the drawing uses, and those they use in turn.
+    fn shapes(&self) -> BTreeSet<usize> {
+        let house = house();
+        let mut used = BTreeSet::new();
+        let mut rest = self.body.as_str();
+        while let Some(i) = rest.find("#s-") {
+            rest = &rest[i + 3..];
+            let end = rest
+                .find(|c: char| !(c.is_alphanumeric() || c == '-'))
+                .unwrap_or(rest.len());
+            if let Some(k) = house.names.iter().position(|n| *n == rest[..end]) {
+                used.insert(k);
+            }
         }
+        let mut more: Vec<usize> = used.iter().copied().collect();
+        while let Some(k) = more.pop() {
+            for &j in &house.shapes[k].1 {
+                if used.insert(j) {
+                    more.push(j);
+                }
+            }
+        }
+        used
     }
 
     /// The whole document: the house style, then the drawing.
     pub fn document(&self) -> String {
+        self.document_with(&self.shapes())
+    }
+
+    fn document_with(&self, shapes: &BTreeSet<usize>) -> String {
         let (w, h) = self.size;
+        let house = house();
+        let mut defs = house.paints.clone();
+        for &k in shapes {
+            defs.push_str(&house.shapes[k].0);
+        }
         format!(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><style>{HOUSE_CSS}</style><defs>{HOUSE_SVG}</defs>{}</svg>",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><style>{HOUSE_CSS}</style><defs>{defs}</defs>{}</svg>",
             self.body
         )
     }
+}
+
+/// The documents of a film's frames, all with the same house shapes, so
+/// that frames that differ only by their numbers still move into each
+/// other.
+pub fn documents(sheets: &[Sheet]) -> Vec<String> {
+    let shapes: BTreeSet<usize> = sheets.iter().flat_map(Sheet::shapes).collect();
+    sheets.iter().map(|s| s.document_with(&shapes)).collect()
+}
+
+/// The house's definitions, read once: the paints every drawing gets, and
+/// the shapes, each put only in the drawings that use it.
+struct House {
+    paints: String,
+    /// Each shape's definition, its id written `s-<id>`, and the other
+    /// shapes it uses.
+    shapes: Vec<(String, Vec<usize>)>,
+    names: Vec<String>,
+}
+
+fn house() -> &'static House {
+    static HOUSE: OnceLock<House> = OnceLock::new();
+    HOUSE.get_or_init(|| {
+        let mut paints = String::new();
+        let mut found: Vec<(String, String)> = Vec::new();
+        let mut rest = HOUSE_SVG;
+        while let Some(at) = rest.find("<symbol") {
+            paints.push_str(&rest[..at]);
+            let end = rest[at..]
+                .find("</symbol>")
+                .map_or(rest.len(), |i| at + i + 9);
+            let text = &rest[at..end];
+            let id = text
+                .split("id=\"")
+                .nth(1)
+                .and_then(|s| s.split('"').next())
+                .unwrap_or("")
+                .to_owned();
+            found.push((id, text.to_owned()));
+            rest = &rest[end..];
+        }
+        paints.push_str(rest);
+        let names: Vec<String> = found.iter().map(|(id, _)| id.clone()).collect();
+        let shapes = found
+            .into_iter()
+            .map(|(id, text)| {
+                let own = text.replacen(&format!("id=\"{id}\""), &format!("id=\"s-{id}\""), 1);
+                rename(&own, &names, &[])
+            })
+            .collect();
+        House {
+            paints,
+            shapes,
+            names,
+        }
+    })
+}
+
+/// The symbols a drawing defines itself, which a `<use>` of the same name
+/// means rather than the house's shape.
+fn own_ids(text: &str) -> Vec<String> {
+    let mut ids = Vec::new();
+    let mut rest = text;
+    while let Some(i) = rest.find("<symbol") {
+        rest = &rest[i + 7..];
+        let tag = &rest[..rest.find('>').unwrap_or(rest.len())];
+        if let Some(j) = tag.find("id=\"")
+            && let Some(end) = tag[j + 4..].find('"')
+        {
+            ids.push(tag[j + 4..j + 4 + end].to_owned());
+        }
+    }
+    ids
+}
+
+/// References to house shapes, `href="#cell"`, written as the house names
+/// them, `href="#s-cell"`, so that a part the agent names cell is never
+/// taken for the shape; and which shapes are referred to. A name the text
+/// defines itself is its own.
+fn rename(text: &str, names: &[String], defined: &[String]) -> (String, Vec<usize>) {
+    let mut out = String::with_capacity(text.len());
+    let mut used = Vec::new();
+    let mut rest = text;
+    while let Some(i) = rest.find("href=") {
+        let quote = rest[i + 5..].chars().next();
+        out.push_str(&rest[..i + 5]);
+        rest = &rest[i + 5..];
+        let Some(q @ ('"' | '\'')) = quote else {
+            continue;
+        };
+        if !rest[1..].starts_with('#') {
+            continue;
+        }
+        let id_end = rest[2..].find(q).map_or(rest.len(), |e| e + 2);
+        let id = &rest[2..id_end];
+        out.push(q);
+        out.push('#');
+        if let Some(k) = names.iter().position(|n| n == id)
+            && !defined.iter().any(|d| d == id)
+        {
+            out.push_str("s-");
+            if !used.contains(&k) {
+                used.push(k);
+            }
+        }
+        out.push_str(id);
+        rest = &rest[id_end..];
+    }
+    out.push_str(rest);
+    (out, used)
 }
 
 /// Write `#rrggbb` and `#rgb` colours as `rgb(r,g,b)`, so that a colour
@@ -584,20 +1326,78 @@ pub fn changed(svg: &str, changes: &[(String, String, String)]) -> Result<String
     Ok(out)
 }
 
+/// The value an element's attribute has in a drawing, if it has it.
+pub fn attribute(svg: &str, id: &str, name: &str) -> Option<String> {
+    let at = [format!(" id=\"{id}\""), format!(" id='{id}'")]
+        .iter()
+        .find_map(|needle| svg.find(needle.as_str()))?;
+    let start = svg[..at].rfind('<')?;
+    let end = at + svg[at..].find('>')?;
+    let tag = &svg[start..end];
+    [" ", "\t", "\n"].iter().find_map(|space| {
+        let needle = format!("{space}{name}=\"");
+        let from = tag.find(&needle)? + needle.len();
+        Some(tag[from..from + tag[from..].find('"')?].to_owned())
+    })
+}
+
+/// The value an attribute has when it is not written, in the form of
+/// `value`, so that a frame without it can move into a frame with it: a
+/// transform that does nothing, full opacity.
+pub fn neutral(name: &str, value: &str) -> Option<String> {
+    match name {
+        "opacity" | "fill-opacity" | "stroke-opacity" => Some("1".to_owned()),
+        "transform" => {
+            let mut out = String::new();
+            for call in value.split(')').filter(|c| !c.trim().is_empty()) {
+                let (function, numbers) = call.split_once('(')?;
+                let function = function.trim().trim_start_matches(',').trim();
+                let numbers: Vec<&str> = numbers
+                    .split([' ', ','])
+                    .filter(|n| !n.is_empty())
+                    .collect();
+                let identity: Vec<String> = match function {
+                    "translate" | "skewX" | "skewY" => {
+                        numbers.iter().map(|_| "0".to_owned()).collect()
+                    }
+                    "scale" => numbers.iter().map(|_| "1".to_owned()).collect(),
+                    // Turned by nothing, about the same centre.
+                    "rotate" => numbers
+                        .iter()
+                        .enumerate()
+                        .map(|(k, n)| {
+                            if k == 0 {
+                                "0".to_owned()
+                            } else {
+                                (*n).to_owned()
+                            }
+                        })
+                        .collect(),
+                    "matrix" => ["1", "0", "0", "1", "0", "0"].map(str::to_owned).to_vec(),
+                    _ => return None,
+                };
+                out.push_str(&format!("{function}({}) ", identity.join(" ")));
+            }
+            Some(out.trim_end().to_owned())
+        }
+        _ => None,
+    }
+}
+
 /// A named part of a drawing, and the box it takes, in the drawing's units.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Part {
     pub id: String,
     pub min: (f32, f32),
     pub max: (f32, f32),
+    /// A point on the part, for a note to point at: the middle of its box
+    /// may fall in nothing, for a ring or a part in pieces.
+    pub at: (f32, f32),
 }
 
 impl Part {
     pub fn centre(&self) -> (f32, f32) {
-        (
-            (self.min.0 + self.max.0) / 2.0,
-            (self.min.1 + self.max.1) / 2.0,
-        )
+        self.at
     }
 
     fn area(&self) -> f32 {
@@ -662,32 +1462,102 @@ fn render_one(svg: &str, canvas: &Canvas) -> Result<(Vec<u8>, Vec<Part>), String
     );
     resvg::render(&tree, transform, &mut pixmap.as_mut());
     let mut parts = Vec::new();
-    collect(tree.root(), tiny_skia::Transform::identity(), &mut parts);
+    let mut edges = Vec::new();
+    collect(
+        tree.root(),
+        tiny_skia::Transform::identity(),
+        &mut parts,
+        &mut edges,
+    );
+    // A part that holds others, a membrane round a cell, is pointed at on
+    // its edge: its middle is the others'.
+    let holders: Vec<usize> = (0..parts.len())
+        .filter(|&i| {
+            let p = &parts[i];
+            parts.iter().enumerate().any(|(j, q)| {
+                j != i
+                    && q.id != p.id
+                    && q.min.0 >= p.min.0
+                    && q.min.1 >= p.min.1
+                    && q.max.0 <= p.max.0
+                    && q.max.1 <= p.max.1
+                    && (q.max.0 - q.min.0) * (q.max.1 - q.min.1)
+                        < 0.6 * (p.max.0 - p.min.0) * (p.max.1 - p.min.1)
+            })
+        })
+        .collect();
+    for i in holders {
+        if let Some(edge) = edges[i] {
+            parts[i].at = edge;
+        }
+    }
     Ok((pixmap.take(), parts))
 }
 
 /// The named parts of a group, their boxes found by composing the
 /// transforms from the root down. resvg draws with these relative
 /// transforms; its absolute boxes count a `<use>`'s transform twice.
-fn collect(group: &usvg::Group, at: tiny_skia::Transform, parts: &mut Vec<Part>) {
+fn collect(
+    group: &usvg::Group,
+    at: tiny_skia::Transform,
+    parts: &mut Vec<Part>,
+    edges: &mut Vec<Option<(f32, f32)>>,
+) {
     for node in group.children() {
         let id = node.id();
         if !id.is_empty()
             && let Some((min, max)) = extent(node, at)
         {
+            let middle = ((min.0 + max.0) / 2.0, (min.1 + max.1) / 2.0);
             parts.push(Part {
                 id: id.to_owned(),
                 min,
                 max,
+                at: anchor(node, at, middle, false).map_or(middle, |(p, _)| p),
             });
+            edges.push(anchor(node, at, (middle.0, min.1), true).map(|(p, _)| p));
         }
         if let usvg::Node::Group(g) = node {
-            collect(g, at.pre_concat(g.transform()), parts);
+            collect(g, at.pre_concat(g.transform()), parts, edges);
         }
     }
 }
 
 type Extent = ((f32, f32), (f32, f32));
+
+/// The point of a node nearest `target` that lies on what it draws: the
+/// middle of a filled piece, a point of a line drawn without fill; and its
+/// distance.
+fn anchor(
+    node: &usvg::Node,
+    at: tiny_skia::Transform,
+    target: (f32, f32),
+    outline: bool,
+) -> Option<((f32, f32), f32)> {
+    let distance = |p: (f32, f32)| (p.0 - target.0).hypot(p.1 - target.1);
+    match node {
+        usvg::Node::Group(g) => {
+            let inner = at.pre_concat(g.transform());
+            g.children()
+                .iter()
+                .filter_map(|c| anchor(c, inner, target, outline))
+                .min_by(|a, b| a.1.total_cmp(&b.1))
+        }
+        usvg::Node::Path(p) if outline || p.fill().is_none() => {
+            let mut points: Vec<tiny_skia::Point> = p.data().points().to_vec();
+            at.map_points(&mut points);
+            points
+                .into_iter()
+                .map(|q| ((q.x, q.y), distance((q.x, q.y))))
+                .min_by(|a, b| a.1.total_cmp(&b.1))
+        }
+        leaf => {
+            let (min, max) = extent(leaf, at)?;
+            let middle = ((min.0 + max.0) / 2.0, (min.1 + max.1) / 2.0);
+            Some((middle, distance(middle)))
+        }
+    }
+}
 
 /// The box a node covers, under the transform of its parent.
 fn extent(node: &usvg::Node, at: tiny_skia::Transform) -> Option<Extent> {
@@ -726,21 +1596,38 @@ fn extent(node: &usvg::Node, at: tiny_skia::Transform) -> Option<Extent> {
     }
 }
 
-/// A picture of the kit: every shape with its name, every class as a
-/// swatch.
-pub fn kit_sheet() -> Sheet {
-    let mut body = String::from("<rect width=\"1600\" height=\"1250\" fill=\"#f7f5f0\"/>");
-    for (i, (id, _, _, scale)) in SHAPES.iter().enumerate() {
-        let (col, row) = (i % 7, i / 7);
-        let (mut x, y) = (115.0 + col as f32 * 228.0, 95.0 + row as f32 * 190.0);
-        if *id == "neuron" {
-            // Drawn around its body, its axon reaching far to the right.
-            x -= 60.0;
+/// Shapes on each page of the kit's picture.
+const PER_PAGE: usize = 42;
+
+/// How many pages the kit's picture has: the shapes, then the colours.
+pub fn kit_pages() -> usize {
+    SHAPES.len().div_ceil(PER_PAGE) + 1
+}
+
+/// A page of the kit's picture: shapes with their names, or, on the last
+/// page, the classes that colour a region, as swatches.
+pub fn kit_sheet(page: usize) -> Option<Sheet> {
+    let page = page.max(1);
+    if page > kit_pages() {
+        return None;
+    }
+    let mut body = String::from("<rect width=\"1600\" height=\"1180\" fill=\"#f7f5f0\"/>");
+    if page < kit_pages() {
+        let first = (page - 1) * PER_PAGE;
+        for (i, (id, _, _, scale)) in SHAPES.iter().enumerate().skip(first).take(PER_PAGE) {
+            let k = i - first;
+            let (col, row) = (k % 7, k / 7);
+            let (mut x, y) = (115.0 + col as f32 * 228.0, 95.0 + row as f32 * 190.0);
+            if *id == "neuron" {
+                // Drawn around its body, its axon reaching far to the right.
+                x -= 60.0;
+            }
+            body.push_str(&format!(
+                "<use href=\"#{id}\" transform=\"translate({x} {y}) scale({scale})\"/><text x=\"{x}\" y=\"{}\" text-anchor=\"middle\" class=\"small\">#{id}</text>",
+                y + 85.0
+            ));
         }
-        body.push_str(&format!(
-            "<use href=\"#{id}\" transform=\"translate({x} {y}) scale({scale})\"/><text x=\"{x}\" y=\"{}\" text-anchor=\"middle\" class=\"small\">#{id}</text>",
-            y + 85.0
-        ));
+        return Some(Sheet::read(&body, Some((1600.0, 1180.0))));
     }
     let swatches = [
         "ectoderm",
@@ -777,15 +1664,67 @@ pub fn kit_sheet() -> Sheet {
         "lymph",
     ];
     for (i, class) in swatches.iter().enumerate() {
-        let (col, row) = (i % 11, i / 11);
-        let (x, y) = (30.0 + col as f32 * 143.0, 885.0 + row as f32 * 120.0);
+        let (col, row) = (i % 8, i / 8);
+        let (x, y) = (40.0 + col as f32 * 195.0, 40.0 + row as f32 * 125.0);
         body.push_str(&format!(
-            "<rect x=\"{x}\" y=\"{y}\" width=\"120\" height=\"60\" rx=\"8\" class=\"{class}\"/><text x=\"{}\" y=\"{}\" text-anchor=\"middle\" class=\"small\">{class}</text>",
-            x + 60.0,
-            y + 84.0
+            "<rect x=\"{x}\" y=\"{y}\" width=\"170\" height=\"70\" rx=\"8\" class=\"{class}\"/><text x=\"{}\" y=\"{}\" text-anchor=\"middle\" class=\"small\">{class}</text>",
+            x + 85.0,
+            y + 96.0
         ));
     }
-    Sheet::read(&body, Some((1600.0, 1250.0)))
+    Some(Sheet::read(&body, Some((1600.0, 1180.0))))
+}
+
+/// A template drawn large, the id of each part written on it, for the
+/// agent to see where its parts are.
+pub fn template_sheet(name: &str) -> Result<Sheet, String> {
+    let t = templates::find(name).ok_or_else(|| {
+        format!(
+            "no template {name}; there are {}",
+            templates::names().join(", ")
+        )
+    })?;
+    let (w, h) = (1600.0, 1200.0);
+    let scale = (1500.0 / t.view[2]).min(1100.0 / t.view[3]);
+    let body = macros::expand(
+        &format!("<insert name=\"{name}\" x=\"800\" y=\"600\" scale=\"{scale}\"/>"),
+        (w, h),
+    )?;
+    let probe = Canvas {
+        width: 160,
+        height: 120,
+        scale: 0.1,
+        offset: (0.0, 0.0),
+        background: [0, 0, 0],
+    };
+    let (_, parts) = render(
+        &Picture::Still(&Sheet::read(&body, Some((w, h))).document()),
+        &probe,
+    )?;
+    let mut labels = String::new();
+    for (id, _) in &t.parts {
+        if let Some(p) = parts.iter().find(|p| p.id == *id) {
+            let (x, y) = p.centre();
+            labels.push_str(&format!(
+                "<text x=\"{x:.0}\" y=\"{y:.0}\" text-anchor=\"middle\" font-size=\"19\" font-weight=\"bold\" fill=\"#1f2a44\" stroke=\"#ffffff\" stroke-width=\"5\" stroke-linejoin=\"round\" paint-order=\"stroke\">{id}</text>"
+            ));
+        }
+    }
+    Ok(Sheet::read(&format!("{body}{labels}"), Some((w, h))))
+}
+
+/// A sheet rendered at a width, as RGBA pixels.
+pub fn picture_of(sheet: &Sheet, width: u32) -> Result<(Vec<u8>, u32, u32), String> {
+    let h = (width as f32 * sheet.size.1 / sheet.size.0) as u32;
+    let canvas = Canvas {
+        width,
+        height: h,
+        scale: width as f32 / sheet.size.0,
+        offset: (0.0, 0.0),
+        background: [247, 245, 240],
+    };
+    let (pixels, _) = render(&Picture::Still(&sheet.document()), &canvas)?;
+    Ok((pixels, width, h))
 }
 
 #[cfg(test)]
@@ -932,42 +1871,119 @@ mod tests {
     }
 
     #[test]
-    fn the_kit_sheet_renders() {
-        let sheet = kit_sheet();
+    fn a_drawing_carries_only_the_shapes_it_uses_and_its_own_ids_are_its_own() {
+        let sheet = Sheet::read(
+            "<use href=\"#vessel\" x=\"100\" y=\"100\"/><use href=\"#protein\" x=\"300\" y=\"100\"/><circle id=\"protein\" cx=\"500\" cy=\"500\" r=\"9\"/><use href=\"#mine\"/><symbol id=\"mine\"><circle r=\"3\"/></symbol>",
+            None,
+        );
+        let document = sheet.document();
+        // The vessel brings the red cells it holds.
+        assert!(document.contains("id=\"s-vessel\"") && document.contains("id=\"s-rbc\""));
+        assert!(!document.contains("id=\"s-neuron\""), "only what is used");
+        // The agent's circle named protein is a part, and the protein
+        // shape is still drawn.
+        assert!(!sheet.body.contains("href=\"#protein\""));
+        assert!(sheet.body.contains("href=\"#s-protein\""));
+        assert!(
+            sheet.body.contains("href=\"#mine\""),
+            "a symbol of the drawing's own keeps its name"
+        );
         let canvas = Canvas {
-            width: 400,
-            height: 312,
-            scale: 0.25,
+            width: 160,
+            height: 100,
+            scale: 0.1,
             offset: (0.0, 0.0),
-            background: [247, 245, 240],
+            background: [255, 255, 255],
         };
-        assert!(render(&Picture::Still(&sheet.document()), &canvas).is_ok());
+        let (_, parts) = render(&Picture::Still(&document), &canvas).expect("renders");
+        assert!(
+            parts
+                .iter()
+                .any(|p| p.id == "protein" && (p.at.0 - 500.0).abs() < 1.0)
+        );
     }
 
-    /// Write the kit's picture to `$CELLSTAGE_OUT/kit.png`, to look at.
     #[test]
-    #[ignore = "writes a picture to look at"]
+    fn a_template_is_set_with_its_parts() {
+        let name = templates::names()[0];
+        let t = templates::find(name).expect("a template");
+        let out = macros::expand(
+            &format!("<insert name=\"{name}\" x=\"400\" y=\"300\" width=\"500\" prefix=\"a\"/>"),
+            (800.0, 600.0),
+        )
+        .expect("expands");
+        let (first, _) = &t.parts[0];
+        assert!(out.contains(&format!("id=\"a_{first}\"")));
+        let sheet = Sheet::read(&out, Some((800.0, 600.0)));
+        let canvas = Canvas {
+            width: 80,
+            height: 60,
+            scale: 0.1,
+            offset: (0.0, 0.0),
+            background: [255, 255, 255],
+        };
+        let (_, parts) = render(&Picture::Still(&sheet.document()), &canvas).expect("renders");
+        let part = parts
+            .iter()
+            .find(|p| p.id == format!("a_{first}"))
+            .expect("the part is found");
+        assert!(
+            part.max.0 <= 660.0 && part.min.0 >= 140.0,
+            "inside the width given: {part:?}"
+        );
+        assert!(macros::expand("<insert name=\"unicorn\"/>", (1.0, 1.0)).is_err());
+    }
+
+    #[test]
+    fn a_missing_attribute_has_a_neutral_value_to_move_from() {
+        assert_eq!(
+            neutral("transform", "translate(70 0) rotate(30 5 5) scale(2)").as_deref(),
+            Some("translate(0 0) rotate(0 5 5) scale(1)")
+        );
+        assert_eq!(neutral("opacity", "0.2").as_deref(), Some("1"));
+        assert_eq!(neutral("fill", "#fff"), None);
+        let svg = "<g id=\"a\" class=\"x\"><rect id=\"b\" opacity=\"0.5\"/></g>";
+        assert_eq!(attribute(svg, "b", "opacity").as_deref(), Some("0.5"));
+        assert_eq!(attribute(svg, "a", "opacity"), None);
+    }
+
+    #[test]
+    fn the_kit_sheets_render() {
+        for page in 1..=kit_pages() {
+            let sheet = kit_sheet(page).expect("a page");
+            assert!(picture_of(&sheet, 400).is_ok(), "page {page}");
+        }
+        assert!(kit_sheet(kit_pages() + 1).is_none());
+    }
+
+    /// Write the kit's pages and every template to `$CELLSTAGE_OUT`, to
+    /// look at.
+    #[test]
+    #[ignore = "writes pictures to look at"]
     fn draw_the_kit() {
         let Some(dir) = std::env::var_os("CELLSTAGE_OUT") else {
             return;
         };
-        let sheet = kit_sheet();
-        let canvas = Canvas {
-            width: 1600,
-            height: 1250,
-            scale: 1.0,
-            offset: (0.0, 0.0),
-            background: [247, 245, 240],
+        let write = |name: String, sheet: &Sheet| {
+            let (pixels, w, h) = picture_of(sheet, 1600).expect("renders");
+            let file = std::fs::File::create(std::path::Path::new(&dir).join(name)).expect("file");
+            let mut encoder = png::Encoder::new(file, w, h);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            encoder
+                .write_header()
+                .expect("header")
+                .write_image_data(&pixels)
+                .expect("pixels");
         };
-        let (pixels, _) = render(&Picture::Still(&sheet.document()), &canvas).expect("renders");
-        let file = std::fs::File::create(std::path::Path::new(&dir).join("kit.png")).expect("file");
-        let mut encoder = png::Encoder::new(file, 1600, 1250);
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
-        encoder
-            .write_header()
-            .expect("header")
-            .write_image_data(&pixels)
-            .expect("pixels");
+        for page in 1..=kit_pages() {
+            write(format!("kit-{page}.png"), &kit_sheet(page).expect("a page"));
+        }
+        for name in templates::names() {
+            write(
+                format!("template-{name}.png"),
+                &template_sheet(name).expect("a template"),
+            );
+        }
     }
 }

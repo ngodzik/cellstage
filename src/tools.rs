@@ -12,8 +12,10 @@ use serde_json::{Map, Value};
 use crate::cell::dish::{Dish, Fate, GENES, Switch, label};
 use crate::cell::specimen::{self, Compartment, Specimen};
 use crate::drawing::{self, Canvas, Film, Part, Picture, Sheet};
+use crate::figure::{self, Figure};
 use crate::protein::{self, Highlight, Look};
 use crate::scene::{self, Scenes, Style};
+use crate::sources;
 use crate::stage::{Anchor, Arrangement, Kind, MAX_PANELS, Note, Panel, Stage};
 use crate::story::{self, Call, Drawing, Found, PanelSpec, Step, Story};
 use crate::tissue::skin::{self, Lesion, Section};
@@ -107,6 +109,13 @@ pub fn handle(world: &mut World, tool: &str, args: &Value, mode: Mode) -> Result
         "story_remove_step" => story_remove_step(world, args),
         "story_open" => story_open(world, args),
         "library_search" => Ok(library_search(args)),
+        "image_search" => image_search(args),
+        "protein_search" => sources::proteins(&text(args, "query").ok_or("search for what?")?),
+        "pathway_lookup" => sources::reactome(
+            &text(args, "query")
+                .or(text(args, "id"))
+                .ok_or("give a subject, or a Reactome id such as R-HSA-109581")?,
+        ),
         "get_user_events" => {
             let events: Vec<String> = std::mem::take(&mut world.resource_mut::<Stage>().events);
             Ok(if events.is_empty() {
@@ -130,6 +139,10 @@ pub fn handle(world: &mut World, tool: &str, args: &Value, mode: Mode) -> Result
                 "show_cell" => show_cell(world, &args),
                 "show_skin" => show_skin(world, &args),
                 "draw" => draw(world, &args),
+                "show_diagram" => show_diagram(world, &args),
+                "show_chart" => show_chart(world, &args),
+                "show_text" => show_text(world, &args),
+                "show_image" => show_image(world, &args),
                 "annotate" => annotate(world, &args),
                 "clear_annotations" => {
                     let only = text(&args, "panel");
@@ -297,6 +310,7 @@ fn prepare(
         panel.pan = egui::Vec2::ZERO;
     }
     panel.kind = kind;
+    panel.label = None;
     if let Some(title) = text(args, "title") {
         panel.title = title;
     } else if panel.title == panel.id {
@@ -319,6 +333,7 @@ fn clear_panel(world: &mut World, id: &str) {
         .find(|p| p.id == id)
     {
         panel.kind = Kind::Empty;
+        panel.label = None;
         panel.image = None;
         panel.texture = None;
         panel.source.clear();
@@ -328,8 +343,18 @@ fn clear_panel(world: &mut World, id: &str) {
 }
 
 fn show_protein(world: &mut World, args: &Value) -> Result<String, String> {
-    let first = text(args, "pdb_id").ok_or("which PDB entry?")?;
-    let mut texts = vec![protein::fetch(&first).map_err(|e| e.to_string())?];
+    let predicted = match text(args, "uniprot") {
+        Some(accession) => Some((accession.to_uppercase(), sources::predicted(&accession)?)),
+        None => None,
+    };
+    let first = match &predicted {
+        Some((accession, _)) => accession.clone(),
+        None => text(args, "pdb_id").ok_or("which PDB entry, or which UniProt accession?")?,
+    };
+    let mut texts = vec![match &predicted {
+        Some((_, p)) => p.text.clone(),
+        None => protein::fetch(&first).map_err(|e| e.to_string())?,
+    }];
     let second = text(args, "second_pdb_id");
     if let Some(id) = &second {
         texts.push(protein::fetch(id).map_err(|e| e.to_string())?);
@@ -384,15 +409,42 @@ fn show_protein(world: &mut World, args: &Value) -> Result<String, String> {
     {
         let mut stage = world.resource_mut::<Stage>();
         if let Some(panel) = stage.panels.iter_mut().find(|p| p.id == id) {
-            panel.source = match &second {
-                Some(s) => format!(
+            panel.source = match (&predicted, &second) {
+                (Some((accession, p)), _) => {
+                    panel.label = Some("PREDICTED STRUCTURE · AlphaFold, not measured".to_owned());
+                    format!(
+                        "AlphaFold DB, UniProt {accession}, mean confidence {:.0} of 100",
+                        p.confidence
+                    )
+                }
+                (None, Some(s)) => format!(
                     "PDB {} and {}, {experiment}",
                     first.to_uppercase(),
                     s.to_uppercase()
                 ),
-                None => format!("PDB {}, {experiment}", first.to_uppercase()),
+                (None, None) => format!("PDB {}, {experiment}", first.to_uppercase()),
             };
         }
+    }
+    if let Some((accession, p)) = &predicted {
+        let loose = if p.loose.is_empty() {
+            "No long stretch is predicted with low confidence.".to_owned()
+        } else {
+            format!(
+                "Predicted with low confidence (pLDDT under 50), likely without a fixed shape, so their shape here means little: residues {}.",
+                p.loose
+                    .iter()
+                    .map(|(a, b)| format!("{a}-{b}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
+        return Ok(format!(
+            "Showing the AlphaFold prediction for {accession}, {}, in panel {id}: a predicted structure, not a measured one; mean confidence {:.0} of 100. {loose}\n{}",
+            p.name,
+            p.confidence,
+            contents(&structures[0])
+        ));
     }
     Ok(format!(
         "Showing {} in panel {id}: {title} ({experiment}).\n{}",
@@ -735,6 +787,29 @@ fn background(args: &Value) -> [u8; 3] {
     }
 }
 
+/// What a panel that shows a drawing says of itself, besides being one.
+struct Labelled {
+    label: Option<String>,
+    source: Option<String>,
+    title: &'static str,
+    /// What the parts are, from whatever made the drawing.
+    described: Vec<(String, String)>,
+    /// Whether the answer names every part; a chart's points are many.
+    name_parts: bool,
+}
+
+impl Labelled {
+    fn drawing() -> Self {
+        Self {
+            label: None,
+            source: None,
+            title: "A drawing",
+            described: Vec::new(),
+            name_parts: true,
+        }
+    }
+}
+
 fn draw(world: &mut World, args: &Value) -> Result<String, String> {
     let mut inputs: Vec<String> = Vec::new();
     if let Some(svg) = text(args, "svg") {
@@ -746,6 +821,22 @@ fn draw(world: &mut World, args: &Value) -> Result<String, String> {
     if inputs.is_empty() {
         return Err("give svg, or frames, or the name of a drawing kept in the library".to_owned());
     }
+    let size = args
+        .get("view_box")
+        .and_then(Value::as_array)
+        .and_then(|a| Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32)));
+    let size = Sheet::read(&inputs[0], size).size;
+    // Shorthands written out and pictures fetched first, so that changes
+    // may name what they made.
+    let mut inputs: Vec<String> = inputs
+        .iter()
+        .enumerate()
+        .map(|(k, i)| {
+            drawing::macros::expand(i, size)
+                .and_then(|s: String| sources::resolve_commons(&s))
+                .map_err(|e| format!("frame {}: {e}", k + 1))
+        })
+        .collect::<Result<_, _>>()?;
     // Frames given by what changes from the frame before.
     if let Some(list) = args.get("changes").and_then(Value::as_array) {
         let mut last = inputs.last().cloned().unwrap_or_default();
@@ -760,20 +851,56 @@ fn draw(world: &mut World, args: &Value) -> Result<String, String> {
                     edits.push((id.clone(), attribute.clone(), value));
                 }
             }
+            // An attribute brought in by a change is given its neutral
+            // value in the frames before, so that they move into it rather
+            // than fade.
+            for (id, attribute, value) in &edits {
+                if drawing::attribute(&last, id, attribute).is_none()
+                    && let Some(neutral) = drawing::neutral(attribute, value)
+                {
+                    let edit = [(id.clone(), attribute.clone(), neutral)];
+                    for frame in inputs.iter_mut() {
+                        if drawing::attribute(frame, id, attribute).is_none() {
+                            *frame =
+                                drawing::changed(frame, &edit).unwrap_or_else(|_| frame.clone());
+                        }
+                    }
+                    last = drawing::changed(&last, &edit).unwrap_or(last);
+                }
+            }
             last = drawing::changed(&last, &edits).map_err(|e| format!("change {}: {e}", k + 1))?;
             inputs.push(last.clone());
         }
     }
-    let size = args
-        .get("view_box")
-        .and_then(Value::as_array)
-        .and_then(|a| Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32)));
-    let first = Sheet::read(&inputs[0], size);
-    let size = first.size;
-    let documents: Vec<String> = inputs
-        .iter()
-        .map(|i| Sheet::read(i, Some(size)).document())
-        .collect();
+    stage_drawing(world, args, inputs, size, Labelled::drawing())
+}
+
+/// A figure the window laid out, shown as a drawing.
+fn show_figure(
+    world: &mut World,
+    args: &Value,
+    figure: Result<Figure, String>,
+    mut how: Labelled,
+) -> Result<String, String> {
+    let figure = figure?;
+    how.described = figure.parts;
+    let svg = format!(
+        "<svg viewBox=\"0 0 {} {}\">{}</svg>",
+        figure.size.0, figure.size.1, figure.svg
+    );
+    stage_drawing(world, args, vec![svg], figure.size, how)
+}
+
+/// Put a drawing's frames in a panel.
+fn stage_drawing(
+    world: &mut World,
+    args: &Value,
+    inputs: Vec<String>,
+    size: (f32, f32),
+    how: Labelled,
+) -> Result<String, String> {
+    let sheets: Vec<Sheet> = inputs.iter().map(|i| Sheet::read(i, Some(size))).collect();
+    let documents = drawing::documents(&sheets);
     // Read every frame now, so that a mistake is told while the agent is
     // still drawing.
     let probe = Canvas {
@@ -791,22 +918,24 @@ fn draw(world: &mut World, args: &Value) -> Result<String, String> {
             parts = p;
         }
     }
-    let described: Vec<(String, String)> = args
-        .get("parts")
-        .and_then(Value::as_object)
-        .map(|m| {
-            m.iter()
-                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_owned()))
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut described = drawing::macros::descriptions(&inputs[0]);
+    for (id, what) in how.described.into_iter().chain(
+        args.get("parts")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_owned())),
+    ) {
+        described.retain(|(i, _)| *i != id);
+        described.push((id, what));
+    }
     let frames = documents.len();
     let seconds = number(args, "seconds").unwrap_or(2.0) as f32;
     let hold = number(args, "hold").unwrap_or(0.8) as f32;
     let looping = args.get("loop").and_then(Value::as_bool).unwrap_or(false);
     let film = Film::new(documents, hold, seconds, looping);
     let length = film.length();
-    let id = prepare(world, args, Kind::Drawing, "A drawing")?;
+    let id = prepare(world, args, Kind::Drawing, how.title)?;
     let image = world
         .resource_mut::<Assets<Image>>()
         .add(crate::blank(16, 16));
@@ -832,28 +961,140 @@ fn draw(world: &mut World, args: &Value) -> Result<String, String> {
     {
         panel.image = Some(image);
         panel.texture = None;
-        panel.source = if frames > 1 {
-            format!("{frames} frames")
-        } else {
-            String::new()
+        panel.label = how.label;
+        panel.source = match (how.source, frames > 1) {
+            (Some(s), _) => s,
+            (None, true) => format!("{frames} frames"),
+            (None, false) => String::new(),
         };
     }
     let mut ids: Vec<&str> = parts.iter().map(|p| p.id.as_str()).collect();
     ids.dedup();
-    let mut answer = format!("Drew in panel {id}, {} by {} units", size.0, size.1);
+    let mut answer = format!("Shown in panel {id}, {} by {} units", size.0, size.1);
     if frames > 1 {
         answer.push_str(&format!(", {frames} frames over {length:.1} s"));
     }
     answer.push('.');
-    if ids.is_empty() {
-        answer.push_str(" It has no named parts: give ids to what you will point at.");
-    } else {
-        answer.push_str(&format!(
-            " Parts to point at with annotate on=: {}.",
-            ids.join(", ")
-        ));
+    if how.name_parts {
+        if ids.is_empty() {
+            answer.push_str(" It has no named parts: give ids to what you will point at.");
+        } else {
+            answer.push_str(&format!(
+                " Parts to point at with annotate on=: {}.",
+                ids.join(", ")
+            ));
+        }
     }
     Ok(answer)
+}
+
+fn show_diagram(world: &mut World, args: &Value) -> Result<String, String> {
+    show_figure(
+        world,
+        args,
+        figure::diagram::diagram(args),
+        Labelled {
+            label: Some("SCHEMATIC · laid out from the agent's nodes and edges".to_owned()),
+            title: "A diagram",
+            ..Labelled::drawing()
+        },
+    )
+}
+
+fn show_chart(world: &mut World, args: &Value) -> Result<String, String> {
+    let source = text(args, "source").unwrap_or_default();
+    let chart = figure::chart::chart(args)?;
+    let series: Vec<String> = chart.parts.iter().map(|(id, _)| id.clone()).collect();
+    let answer = show_figure(
+        world,
+        args,
+        Ok(chart),
+        Labelled {
+            label: Some("CHART · numbers given by the agent".to_owned()),
+            source: Some(format!("from {source}")),
+            title: "A chart",
+            name_parts: false,
+            ..Labelled::drawing()
+        },
+    )?;
+    Ok(format!(
+        "{answer} Series to point at: {}; each point or bar is the series id with _1, _2... after it.",
+        series.join(", ")
+    ))
+}
+
+fn show_text(world: &mut World, args: &Value) -> Result<String, String> {
+    show_figure(
+        world,
+        args,
+        figure::page::page(args),
+        Labelled {
+            label: Some("TEXT · written by the agent".to_owned()),
+            title: "Notes",
+            ..Labelled::drawing()
+        },
+    )
+}
+
+fn show_image(world: &mut World, args: &Value) -> Result<String, String> {
+    let file = text(args, "file").ok_or("which file? image_search finds them")?;
+    let p = sources::commons_picture(&file)?;
+    let (w, h) = (p.width as f32, p.height as f32);
+    let svg = format!(
+        "<svg viewBox=\"0 0 {w} {h}\"><image id=\"picture\" href=\"{}\" x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\"/></svg>",
+        drawing::text::escape(&p.path.to_string_lossy())
+    );
+    let mut how = Labelled {
+        label: Some("PICTURE · Wikimedia Commons".to_owned()),
+        source: Some(format!("{}, {}", short_credit(&p.author), p.licence)),
+        title: "A picture",
+        name_parts: false,
+        ..Labelled::drawing()
+    };
+    how.described = vec![("picture".to_owned(), p.description.clone())];
+    let answer = stage_drawing(world, args, vec![svg], (w, h), how)?;
+    Ok(format!(
+        "{answer} {}: {} By {}, {}. Point at things in it with annotate arrow_to=[x, y] as fractions of the picture, or draw over it with draw and <image href=\"commons:{}\" width=\"{w}\" height=\"{h}\"/>.",
+        p.title, p.description, p.author, p.licence, p.title
+    ))
+}
+
+/// An author's credit short enough for a panel's label.
+fn short_credit(author: &str) -> String {
+    let a = author.trim();
+    if a.chars().count() > 60 {
+        format!("{}…", a.chars().take(58).collect::<String>())
+    } else if a.is_empty() {
+        "author unknown".to_owned()
+    } else {
+        a.to_owned()
+    }
+}
+
+fn image_search(args: &Value) -> Result<String, String> {
+    let query = text(args, "query").ok_or("search for what?")?;
+    let limit = number(args, "limit").unwrap_or(8.0) as usize;
+    let found = sources::commons_search(&query, limit)?;
+    if found.is_empty() {
+        return Ok(format!(
+            "Nothing on Wikimedia Commons for {query}; try other words, in English."
+        ));
+    }
+    let mut out = String::from(
+        "On Wikimedia Commons (show_image file=... shows one; its licence and author are shown with it):\n",
+    );
+    for p in found {
+        out.push_str(&format!(
+            "- {} ({} by {} px; {}; by {}): {}\n",
+            p.title,
+            p.width,
+            p.height,
+            p.licence,
+            short_credit(&p.author),
+            p.description
+        ));
+    }
+    Ok(out)
 }
 
 fn annotate(world: &mut World, args: &Value) -> Result<String, String> {
@@ -964,6 +1205,27 @@ fn now() -> u64 {
         .unwrap_or(0)
 }
 
+/// The calls that fill a panel.
+const SHOWS: [&str; 8] = [
+    "show_protein",
+    "show_skin",
+    "show_cell",
+    "draw",
+    "show_diagram",
+    "show_chart",
+    "show_text",
+    "show_image",
+];
+
+/// The calls whose panel is a drawing, which can move into one another.
+const DRAWN: [&str; 5] = [
+    "draw",
+    "show_diagram",
+    "show_chart",
+    "show_text",
+    "show_image",
+];
+
 /// Keep a call in the step on screen: its panels as the stage now has
 /// them, and what the call put in its panel.
 fn record(world: &mut World, tool: &str, args: &Value) {
@@ -1008,7 +1270,7 @@ fn record(world: &mut World, tool: &str, args: &Value) {
     let panel = text(args, "panel");
     let mut displayed = None;
     match tool {
-        "show_protein" | "show_skin" | "show_cell" | "draw" => {
+        tool if SHOWS.contains(&tool) => {
             if let Some(spec) = step
                 .panels
                 .iter_mut()
@@ -1094,7 +1356,11 @@ pub fn show_step(world: &mut World, n: usize, forward: bool) {
         if spec.show != current {
             // The frame a drawing showed, to move from.
             let from = match (&spec.show, &current) {
-                (Some(new), Some(old)) if forward && new.tool == "draw" && old.tool == "draw" => {
+                (Some(new), Some(old))
+                    if forward
+                        && DRAWN.contains(&new.tool.as_str())
+                        && DRAWN.contains(&old.tool.as_str()) =>
+                {
                     world.resource::<Views>().drawings.get(&spec.id).map(|d| {
                         let last = d.film.frames().len().saturating_sub(1);
                         d.film.frames()[last].clone()
@@ -1419,16 +1685,13 @@ pub fn library_list() -> Vec<(String, String, usize, String)> {
 }
 
 /// The kit's picture, for the agent to see the shapes.
-pub fn kit_picture() -> Result<(Vec<u8>, u32, u32), String> {
-    let sheet = drawing::kit_sheet();
-    let (w, h) = (1100u32, (1100.0 * sheet.size.1 / sheet.size.0) as u32);
-    let canvas = Canvas {
-        width: w,
-        height: h,
-        scale: w as f32 / sheet.size.0,
-        offset: (0.0, 0.0),
-        background: [247, 245, 240],
-    };
-    let (pixels, _) = drawing::render(&Picture::Still(&sheet.document()), &canvas)?;
-    Ok((pixels, w, h))
+pub fn template_parts(t: &drawing::templates::Template) -> String {
+    let mut out = format!(
+        "Template {}: {} Drawn {} by {}; set it with <insert name=\"{}\" x y width/>. Its parts, to point at with annotate on= or recolour:\n",
+        t.name, t.what, t.view[2], t.view[3], t.name
+    );
+    for (id, what) in &t.parts {
+        out.push_str(&format!("- {id}: {what}\n"));
+    }
+    out
 }

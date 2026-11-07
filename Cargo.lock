@@ -1698,6 +1698,7 @@ dependencies = [
  "resvg",
  "serde",
  "serde_json",
+ "ttf-parser",
  "ureq",
 ]
 

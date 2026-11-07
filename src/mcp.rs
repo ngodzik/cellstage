@@ -140,15 +140,24 @@ fn send(message: &Value) {
 
 /// What the agent is told when it connects.
 const INSTRUCTIONS: &str = "\
-cellstage is a window beside this conversation where you tell the user biology as a story in pictures, step by step, and the user moves through the steps with the arrow keys, turning, zooming and clicking what is shown. Anything in the body can be shown: proteins at their measured structure, a cell whose network cellweave runs live, stained sections of skin, and for everything else drawings you write yourself in SVG (an embryo, an organ, the brain, blood, a pathway, a timeline), which can move from one frame to the next.
+cellstage is a window beside this conversation where you tell the user biology as a story in pictures, step by step, and the user moves through the steps with the arrow keys, turning, zooming and clicking what is shown. Anything in the body can be shown, at every scale: the body and its organs, tissues, cells, molecules, the embryo, microbes; pathways and lineages; numbers; real pictures.
+
+What you can put in a panel:
+- draw: a drawing you write in SVG, with the house style. drawing_kit (once per conversation) gives you 120 ready-made shapes (cells of every kind, organelles, molecules, microbes, eggs and embryos), 31 templates of whole things with their parts named (the body, the brain in three views, the heart, lungs, kidney and nephron, eye, bone, skin, spinal cord, the inside of a cell, a synapse, a membrane, DNA packaging, a sarcomere, liver, gut wall, alveolus, lymph node, marrow, islet, thyroid, a tumour's surroundings, and the embryo from the egg to four weeks), and shorthands that scatter shapes over a region, set them in a ring, a row, a grid or along a path, or draw a lipid bilayer or a double helix along any path. Start from a template and add to it, rather than drawing an organ from nothing.
+- show_diagram: a pathway, a lineage, a cascade, a cycle, a sequence of events, as nodes and edges; the window lays it out. Nodes can be house shapes, for a lineage of cells.
+- show_chart: numbers as lines, areas, bars or points, always with where they come from.
+- show_text: a page of words, headings, lists, a definition set apart, for a course's summary or vocabulary.
+- show_image: a real picture from Wikimedia Commons, a micrograph, a scan, an old anatomical plate; image_search finds them with their licence, and the panel credits the author.
+- show_protein: a protein at its measured structure (Protein Data Bank), or the AlphaFold prediction for any human protein by its UniProt accession; protein_search finds both from a name. pathway_lookup reads Reactome, to draw a pathway from what is known.
+- show_cell: one cell whose protein network cellweave runs live; show_skin: stained sections of skin, normal or with a melanocytic lesion.
 
 How to work:
 1. First call library_search with the subject. Every story ever told here is kept on disk; if one fits, story_open shows it at once, and you tell it from there, adding or changing steps as needed. Kept drawings can be reused by name.
-2. Otherwise story_new, then build the story one step at a time. Each step has a title and a narration of one to three short sentences shown under the pictures; then lay the step out (stage_layout, one to six panels; one large panel is often best) and fill its panels with show_protein, show_cell, show_skin or draw. story_step adds the next step; keep_panels carries the panels over so you change only what moves on.
+2. Otherwise story_new, then build the story one step at a time. Each step has a title and a narration of one to three short sentences shown under the pictures; then lay the step out (stage_layout, one to six panels; one large panel is often best) and fill its panels. story_step adds the next step; keep_panels carries the panels over so you change only what moves on.
 3. Everything you show is kept in the step on screen as you go. Every answer ends with where you are, [story, step k of n]. If the user moved to another step, your calls change that step.
-4. draw: call drawing_kit once per conversation for the house classes and ready-made shapes, which give every drawing the same look. Give ids to the parts you will point at. To show something changing (the neural tube closing, cells migrating, a tumour growing), give changes: each further frame as what changes from the one before, {id: {attribute: value}}; the window moves smoothly between them. It is much quicker to write than whole frames. Name a drawing worth reusing, so it is kept in the library.
-5. annotate with on=<part> to point at a named part of a drawing, a section or a cell (the show and draw answers list them), or chain and residue on a protein: the window places the note itself. Avoid coordinates and avoid checking with screenshot after every call; one screenshot when a new layout is done is enough.
-6. Every panel is labelled by what it is: a measured structure (Protein Data Bank), a simulation (cellweave's model) or an illustration (a section drawn from histology, or your schematic). Never present an illustration as a measurement or a simulation result.
+4. To show something changing (the neural tube closing, cells migrating, a heart beating, a tumour growing), give draw changes: each further frame as what changes from the one before, {id: {attribute: value}}; the window moves smoothly between them. A drawing, diagram or chart that comes back in the next step with numbers changed also moves into it. Name a drawing worth reusing, so it is kept in the library.
+5. annotate with on=<part> to point at a named part of a drawing, a template, a diagram's node, a section or a cell (the answers list them), or chain and residue on a protein: the window places the note itself. Avoid coordinates and avoid checking with screenshot after every call; one screenshot when a new layout is done is enough.
+6. Every panel is labelled by what it is: a measured structure, a predicted structure, a simulation, an illustration or schematic, a chart of numbers you gave, a picture with its author and licence. Never present an illustration as a measurement or a simulation result, and never make up numbers for a chart without saying so in its source.
 7. get_user_events tells you what the user clicked and which step they moved to. Call it when they refer to something in the window.
 The story carries the pictures and the short words; the teaching, the longer explanations and any revision are yours, in the conversation.";
 
@@ -243,7 +252,7 @@ fn tools() -> Value {
         },
         {
             "name": "draw",
-            "description": "Draw in a panel with SVG you write: anything the other tools do not show, at any scale, from the body to a molecule. The window adds the house style (call drawing_kit for its classes and shapes) and a light page. Give frames to show a change: the window moves smoothly from each frame to the next. Give ids to parts you will point at. With only a name, shows a drawing kept in the library.",
+            "description": "Draw in a panel with SVG you write: anything the other tools do not show, at any scale, from the body to a molecule. The window adds the house style (call drawing_kit for its classes, shapes, templates and shorthands) and a light page. <insert name=\"heart\"/> sets a whole template with named parts; <scatter>, <ring>, <grid>, <along>, <bilayer>, <helix> write many elements at once. Give changes or frames to show a change: the window moves smoothly from each frame to the next. Give ids to parts you will point at. With only a name, shows a drawing kept in the library.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -252,7 +261,7 @@ fn tools() -> Value {
                     "caption": {"type": "string"},
                     "svg": {"type": "string", "description": "SVG elements, in a 1600 by 1000 space unless view_box says otherwise; or a whole <svg> document."},
                     "frames": {"type": "array", "items": {"type": "string"}, "description": "Further frames after svg (or all of them without svg): the same drawing with numbers changed."},
-                    "changes": {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"type": ["string", "number"]}}}, "description": "Further frames, each given by what changes from the frame before: {element id: {attribute: new value}}, such as {\"crest_1\": {\"transform\": \"translate(420 380) scale(0.6)\"}, \"label\": {\"opacity\": 1}}. Far shorter than whole frames; change attributes the first frame already has."},
+                    "changes": {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"type": ["string", "number"]}}}, "description": "Further frames, each given by what changes from the frame before: {element id: {attribute: new value}}, such as {\"crest_1\": {\"transform\": \"translate(420 380) scale(0.6)\"}, \"label\": {\"opacity\": 1}}. Far shorter than whole frames. A transform or an opacity may be new; other attributes should be in the first frame already."},
                     "view_box": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2, "description": "Width and height of the drawing space."},
                     "seconds": {"type": "number", "default": 2, "description": "How long each move from one frame to the next takes."},
                     "hold": {"type": "number", "default": 0.8, "description": "How long each frame is held before moving on."},
@@ -266,17 +275,141 @@ fn tools() -> Value {
         },
         {
             "name": "drawing_kit",
-            "description": "The house style for draw: its classes (cells, organelles, germ layers, tissues, organs, molecules, arrows, effects) and ready-made shapes (cells of every kind, blood cells, neuron, DNA, receptor, vessel, virus...). Call once per conversation. With picture, also a picture of them all.",
-            "inputSchema": {"type": "object", "properties": {"picture": {"type": "boolean", "default": false}}}
+            "description": "The house style for draw: its classes, its 120 ready-made shapes (cells of every kind, organelles, molecules, microbes, eggs and embryos), its templates of whole things with named parts (organs, the brain, sections, the embryo's stages, the inside of a cell), and its shorthands. Call once per conversation. With picture, a page of the kit's picture; with template, the parts of one template, and with picture, where they are.",
+            "inputSchema": {"type": "object", "properties": {
+                "picture": {"type": "boolean", "default": false},
+                "page": {"type": "integer", "minimum": 1, "description": "Which page of the kit's picture."},
+                "template": {"type": "string", "description": "A template's name, for its parts."}
+            }}
+        },
+        {
+            "name": "show_diagram",
+            "description": "A diagram the window lays out from nodes and edges: a signalling pathway, a cell lineage, a cascade, a feedback loop, a cycle, a sequence of events. Nodes are set in layers along the flow and ordered to cross few edges. Each node and edge is a part to point at (edges are from_to_to). Shown again in a later step with highlight or dim changed, it moves into the new state.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "panel": {"type": "string"},
+                    "title": {"type": "string"},
+                    "caption": {"type": "string"},
+                    "direction": {"type": "string", "enum": ["right", "down"], "default": "right"},
+                    "nodes": {"type": "array", "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "label": {"type": "string"},
+                            "kind": {"type": "string", "enum": ["protein", "receptor", "ligand", "molecule", "ion", "hormone", "gene", "rna", "complex", "cell", "tissue", "organ", "process", "event", "state", "outcome", "microbe"], "default": "protein"},
+                            "shape": {"type": "string", "description": "A house shape drawn as the node, such as rbc or neutrophil, for lineages."},
+                            "colour": {"type": "string", "description": "#rrggbb fill instead of the kind's."},
+                            "what": {"type": "string", "description": "What it is, told to you when the user clicks it."},
+                            "layer": {"type": "integer", "description": "Pin the node to a layer, 0 first."}
+                        },
+                        "required": ["id"]
+                    }},
+                    "edges": {"type": "array", "items": {
+                        "type": "object",
+                        "properties": {
+                            "from": {"type": "string"},
+                            "to": {"type": "string"},
+                            "kind": {"type": "string", "enum": ["activates", "inhibits", "becomes", "binds", "makes", "moves", "line"], "default": "activates"},
+                            "label": {"type": "string"}
+                        },
+                        "required": ["from", "to"]
+                    }},
+                    "groups": {"type": "array", "items": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}, "label": {"type": "string"}, "nodes": {"type": "array", "items": {"type": "string"}}, "colour": {"type": "string"}},
+                        "required": ["label", "nodes"]
+                    }, "description": "Boxes drawn behind some nodes: a compartment, the nucleus, a membrane."},
+                    "highlight": {"type": "array", "items": {"type": "string"}, "description": "Node ids ringed in yellow."},
+                    "dim": {"type": "array", "items": {"type": "string"}, "description": "Node ids faded, with their edges."}
+                },
+                "required": ["panel", "nodes"]
+            }
+        },
+        {
+            "name": "show_chart",
+            "description": "A chart of numbers you give: lines, areas, bars (grouped or stacked) or points. Say where the numbers come from in source; it is shown on the panel. Each series is a part (series_<name>), each point or bar series_<name>_<n>. The same chart with other values in a later step moves into it, bars growing (fix y_max to keep the axis).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "panel": {"type": "string"},
+                    "title": {"type": "string"},
+                    "caption": {"type": "string"},
+                    "kind": {"type": "string", "enum": ["line", "area", "bar", "scatter"], "default": "line"},
+                    "source": {"type": "string", "description": "Where the numbers come from: a paper, a database, or 'made up to show the shape'."},
+                    "x": {"type": "array", "items": {"type": "number"}, "description": "x values shared by the series' values."},
+                    "categories": {"type": "array", "items": {"type": "string"}, "description": "Names along the x axis, for bars or labelled points."},
+                    "series": {"type": "array", "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "values": {"type": "array", "items": {"type": "number"}},
+                            "points": {"type": "array", "items": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}},
+                            "colour": {"type": "string"}
+                        }
+                    }},
+                    "x_label": {"type": "string"},
+                    "y_label": {"type": "string"},
+                    "y_min": {"type": "number"},
+                    "y_max": {"type": "number"},
+                    "log_y": {"type": "boolean", "default": false},
+                    "stacked": {"type": "boolean", "default": false}
+                },
+                "required": ["panel", "series", "source"]
+            }
+        },
+        {
+            "name": "show_text",
+            "description": "A page of words in a panel, laid out and wrapped by the window: # heading, ## subheading, - item, 1. item, > a definition set apart, **bold**, blank lines between paragraphs. For a summary, the words to remember, the steps of a process. Each block is a part (block_1, block_2...).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "panel": {"type": "string"},
+                    "title": {"type": "string"},
+                    "text": {"type": "string"},
+                    "size": {"type": "number", "default": 30, "description": "Font size of the body text."}
+                },
+                "required": ["panel", "text"]
+            }
+        },
+        {
+            "name": "image_search",
+            "description": "Search Wikimedia Commons for pictures: micrographs, histology, scans, photographs, old anatomical plates (Gray's Anatomy is in the public domain), diagrams. Each result comes with its size, licence and author. Search in English.",
+            "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "limit": {"type": "integer", "default": 8}}, "required": ["query"]}
+        },
+        {
+            "name": "show_image",
+            "description": "Show a picture from Wikimedia Commons in a panel, fetched once and kept in the user's cache, with its author and licence on the panel. Point at things in it with annotate arrow_to=[x, y] as fractions of the picture, or draw over it with draw and <image href=\"commons:File:...\">.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "panel": {"type": "string"},
+                    "file": {"type": "string", "description": "The file's name on Commons, such as File:Melanoma.jpg, as image_search gives it."},
+                    "title": {"type": "string"},
+                    "caption": {"type": "string"}
+                },
+                "required": ["panel", "file"]
+            }
+        },
+        {
+            "name": "protein_search",
+            "description": "Find proteins from a name, a gene or a subject: reviewed human entries of UniProt with what each does (show_protein uniprot= shows the AlphaFold prediction), and measured structures in the PDB with their method and resolution (show_protein pdb_id=).",
+            "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
+        },
+        {
+            "name": "pathway_lookup",
+            "description": "Read Reactome, a curated database of human pathways: with a subject, the pathways and reactions that match; with an id (R-HSA-...), what it is, its inputs, outputs and catalysts, and the steps it holds. To draw a pathway from what is known rather than from memory.",
+            "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "id": {"type": "string"}}}
         },
         {
             "name": "show_protein",
-            "description": "Show a protein, or a complex, at the atomic structure deposited in the Protein Data Bank, in a panel. The user can turn and zoom it, and point at atoms. Give a second entry of the same protein to let the user slide between two states (for example RAS with GDP, 4Q21, and with a GTP analogue, 5P21). The answer lists chains, residue numbers and bound molecules.",
+            "description": "Show a protein, or a complex, at the atomic structure deposited in the Protein Data Bank, or as the AlphaFold database predicts it from a UniProt accession (any human protein, measured or not; labelled as a prediction, and the answer says which stretches are predicted with low confidence). The user can turn and zoom it, and point at atoms. Give a second entry of the same protein to let the user slide between two states (for example RAS with GDP, 4Q21, and with a GTP analogue, 5P21). The answer lists chains, residue numbers and bound molecules. protein_search finds entries from a name.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "panel": {"type": "string"},
                     "pdb_id": {"type": "string", "description": "Four characters, such as 1TSR."},
+                    "uniprot": {"type": "string", "description": "A UniProt accession, such as P04637, to show the AlphaFold prediction instead of a PDB entry."},
                     "second_pdb_id": {"type": "string", "description": "The same protein in another state, laid over the first."},
                     "title": {"type": "string"},
                     "caption": {"type": "string"},
@@ -296,7 +429,7 @@ fn tools() -> Value {
                         "required": ["from"]
                     }}
                 },
-                "required": ["panel", "pdb_id"]
+                "required": ["panel"]
             }
         },
         {
