@@ -34,6 +34,7 @@ mod stage;
 mod story;
 mod tissue;
 mod tools;
+mod world;
 
 use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, Sender, channel};
@@ -66,6 +67,7 @@ fn main() -> anyhow::Result<()> {
     let (to_window, inbox) = channel();
     std::thread::spawn(move || mcp::serve(to_window));
     drawing::warm();
+    world::warm();
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -80,10 +82,12 @@ fn main() -> anyhow::Result<()> {
             ..default()
         }))
         .add_plugins(EguiPlugin::default())
+        .add_plugins((world::glow::GlowPlugin, world::surface::SurfacePlugin))
         .insert_resource(ClearColor(scene::BACKGROUND))
         .insert_resource(Inbox(Mutex::new(inbox)))
         .insert_resource(Stage::default())
         .insert_resource(Scenes::default())
+        .insert_resource(world::Worlds::default())
         .insert_resource(Views::default())
         .insert_resource(GlobalAmbientLight {
             color: Color::srgb(0.75, 0.8, 1.0),
@@ -98,6 +102,7 @@ fn main() -> anyhow::Result<()> {
                 live_cells,
                 render_drawings,
                 scene::place,
+                world::run,
                 hide_on_close,
             )
                 .chain(),

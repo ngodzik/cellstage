@@ -15,6 +15,7 @@ use crate::scene::{self, Scenes};
 use crate::stage::{self, Anchor, Kind, Stage};
 use crate::tissue::skin;
 use crate::tools::{self, Views};
+use crate::world::Worlds;
 
 const BACK: egui::Color32 = egui::Color32::from_rgb(10, 12, 16);
 const WORDS: egui::Color32 = egui::Color32::from_rgb(226, 229, 236);
@@ -33,6 +34,7 @@ pub fn chrome(
     mut stage: ResMut<Stage>,
     mut scenes: ResMut<Scenes>,
     mut views: ResMut<Views>,
+    mut worlds: ResMut<Worlds>,
     cameras: Query<(&Camera, &GlobalTransform)>,
     mut shelf: Local<Shelf>,
 ) -> Result {
@@ -53,6 +55,20 @@ pub fn chrome(
         }
         if back && stage.step > 0 {
             stage.goto = Some(stage.step - 1);
+        }
+    }
+
+    // The space bar plays and pauses the films of the worlds shown.
+    if !ctx.egui_wants_keyboard_input() && ctx.input(|i| i.key_pressed(egui::Key::Space)) {
+        for scene in worlds.map.values_mut() {
+            if scene.playing && !scene.manual {
+                scene.playing = false;
+            } else if scene.clock >= scene.film.length() {
+                scene.replay();
+            } else {
+                scene.playing = true;
+                scene.give_back();
+            }
         }
     }
 
@@ -104,7 +120,7 @@ pub fn chrome(
         .show(&ctx, |ui| {
             for panel in stage.panels.iter_mut() {
                 let content = panel.content();
-                let solid = panel.kind != Kind::Protein;
+                let solid = !matches!(panel.kind, Kind::Protein | Kind::World);
                 stage::frame(ui.painter(), panel, solid);
                 let size = match panel.kind {
                     Kind::Cell => (specimen::SIZE as f32, specimen::SIZE as f32),
@@ -147,6 +163,19 @@ pub fn chrome(
                             }
                             if scroll != 0.0 {
                                 scene.orbit.zoom(scroll / 40.0);
+                            }
+                        }
+                    }
+                    Kind::World => {
+                        if let Some(scene) = worlds.map.get_mut(&panel.id) {
+                            if response.dragged() {
+                                let d = response.drag_delta();
+                                scene.take();
+                                scene.eye.turn(Vec2::new(d.x, d.y));
+                            }
+                            if scroll != 0.0 {
+                                scene.take();
+                                scene.eye.zoom(scroll / 40.0);
                             }
                         }
                     }
@@ -211,6 +240,13 @@ pub fn chrome(
                                 .unwrap_or_default();
                             Some(format!("the part {}{said}", part.id))
                         }),
+                        Kind::World => worlds.map.get(&panel.id).and_then(|scene| {
+                            let (camera, eye) = cameras.get(scene.camera).ok()?;
+                            let ray = camera
+                                .viewport_to_world(eye, Vec2::new(pointer.x, pointer.y))
+                                .ok()?;
+                            scene.pick(ray.origin, *ray.direction)
+                        }),
                         Kind::Empty => None,
                     };
                     let what = what.unwrap_or_else(|| "nothing in particular".to_owned());
@@ -239,6 +275,15 @@ pub fn chrome(
                                 let (camera, eye) = cameras.get(scene.camera).ok()?;
                                 let p = camera.world_to_viewport(eye, atom.at(scene.t)).ok()?;
                                 Some(egui::pos2(p.x, p.y))
+                            })
+                        }
+                        Anchor::Part(name) if panel.kind == Kind::World => {
+                            worlds.map.get(&panel.id).and_then(|scene| {
+                                let p = scene.locate(name)?;
+                                let (camera, eye) = cameras.get(scene.camera).ok()?;
+                                let p = camera.world_to_viewport(eye, p).ok()?;
+                                let p = egui::pos2(p.x, p.y);
+                                content.contains(p).then_some(p)
                             })
                         }
                         Anchor::Part(name) => {
@@ -339,6 +384,9 @@ pub fn chrome(
                             }
                         });
                     });
+                }
+                if let Some(scene) = worlds.map.get_mut(&panel.id) {
+                    film_controls(ui, scene, content);
                 }
             }
         });
@@ -561,4 +609,87 @@ fn image_point(rect: egui::Rect, pointer: egui::Pos2, size: (f32, f32)) -> Vec2 
         (pointer.x - rect.left()) / rect.width() * size.0,
         (pointer.y - rect.top()) / rect.height() * size.1,
     )
+}
+
+/// A world's film: the words said over it, large, near the bottom; the
+/// world's clock; and the buttons to play it again, pause it and move
+/// through it.
+fn film_controls(ui: &mut egui::Ui, scene: &mut crate::world::WorldScene, content: egui::Rect) {
+    let painter = ui.painter().with_clip_rect(content);
+    if let Some((words, shown)) = &scene.say
+        && *shown > 0.01
+    {
+        let alpha = (shown * 255.0) as u8;
+        let galley = painter.layout(
+            words.clone(),
+            egui::FontId::proportional(24.0),
+            egui::Color32::from_rgba_unmultiplied(246, 244, 238, alpha),
+            (content.width() - 120.0).min(1100.0),
+        );
+        let at = egui::pos2(
+            content.center().x - galley.size().x * 0.5,
+            content.bottom() - 70.0 - galley.size().y,
+        );
+        painter.rect_filled(
+            egui::Rect::from_min_size(at, galley.size()).expand2(egui::vec2(18.0, 10.0)),
+            8.0,
+            egui::Color32::from_rgba_unmultiplied(0, 0, 0, (shown * 150.0) as u8),
+        );
+        painter.galley(at, galley, egui::Color32::WHITE);
+    }
+    if scene.film.shots.iter().any(|s| s.years.is_some()) && scene.years >= 0.0 {
+        let years = scene.years;
+        let label = if years < 1.0 {
+            format!("{:.0} months", years * 12.0)
+        } else {
+            format!("year {years:.1}")
+        };
+        painter.text(
+            content.right_top() + egui::vec2(-16.0, 14.0),
+            egui::Align2::RIGHT_TOP,
+            label,
+            egui::FontId::proportional(18.0),
+            egui::Color32::from_rgb(255, 214, 140),
+        );
+    }
+    if scene.film.shots.is_empty() {
+        return;
+    }
+    let bar = egui::Rect::from_min_size(
+        content.left_bottom() + egui::vec2(10.0, -36.0),
+        egui::vec2(content.width().min(460.0), 28.0),
+    );
+    ui.painter().rect_filled(
+        bar.expand(3.0),
+        5.0,
+        egui::Color32::from_rgba_unmultiplied(10, 12, 16, 170),
+    );
+    ui.scope_builder(egui::UiBuilder::new().max_rect(bar), |ui| {
+        ui.horizontal(|ui| {
+            if ui.button("replay").clicked() {
+                scene.replay();
+            }
+            let playing = scene.playing && !scene.manual;
+            if ui.button(if playing { "pause" } else { "play" }).clicked() {
+                if playing {
+                    scene.playing = false;
+                } else {
+                    if scene.clock >= scene.film.length() {
+                        scene.replay();
+                    }
+                    scene.playing = true;
+                    scene.give_back();
+                }
+            }
+            let length = scene.film.length();
+            let mut at = scene.clock;
+            if ui
+                .add(egui::Slider::new(&mut at, 0.0..=length).show_value(false))
+                .changed()
+            {
+                scene.clock = at;
+                scene.give_back();
+            }
+        });
+    });
 }

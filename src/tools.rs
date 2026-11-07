@@ -143,6 +143,7 @@ pub fn handle(world: &mut World, tool: &str, args: &Value, mode: Mode) -> Result
                 "show_chart" => show_chart(world, &args),
                 "show_text" => show_text(world, &args),
                 "show_image" => show_image(world, &args),
+                "show_world" => show_world(world, &args),
                 "annotate" => annotate(world, &args),
                 "clear_annotations" => {
                     let only = text(&args, "panel");
@@ -199,6 +200,7 @@ fn resolve_drawing(args: &Value) -> Result<Value, String> {
 /// Take away whatever a panel showed.
 fn forget(world: &mut World, id: &str) {
     scene::remove(world, id);
+    crate::world::remove(world, id);
     let mut views = world.resource_mut::<Views>();
     views.cells.remove(id);
     views.skins.remove(id);
@@ -293,7 +295,12 @@ fn prepare(
 ) -> Result<String, String> {
     let id = text(args, "panel").ok_or("which panel?")?;
     let keep_cell = kind == Kind::Cell && world.resource::<Views>().cells.contains_key(&id);
-    if !keep_cell {
+    let keep_world = kind == Kind::World
+        && world
+            .resource::<crate::world::Worlds>()
+            .map
+            .contains_key(&id);
+    if !keep_cell && !keep_world {
         forget(world, &id);
     }
     let mut stage = world.resource_mut::<Stage>();
@@ -1097,6 +1104,64 @@ fn image_search(args: &Value) -> Result<String, String> {
     Ok(out)
 }
 
+/// Open a world in a panel, or keep the one it shows, and play the film
+/// the agent directs in it.
+fn show_world(world: &mut World, args: &Value) -> Result<String, String> {
+    let name = text(args, "world").unwrap_or_else(|| "skin".to_owned());
+    let id = prepare(world, args, Kind::World, "Skin, cell by cell")?;
+    crate::world::show(world, &id, &name)?;
+    let mut worlds = world.resource_mut::<crate::world::Worlds>();
+    let scene = worlds
+        .map
+        .get_mut(&id)
+        .ok_or("the world could not be opened")?;
+    let mut start = scene.eye;
+    if let Some(place) = text(args, "place") {
+        start = scene.place(&place).ok_or_else(|| {
+            format!(
+                "no place {place}; there are {}",
+                scene
+                    .places()
+                    .iter()
+                    .map(|p| p.name)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        })?;
+        scene.eye = start;
+    }
+    let years = number(args, "years").map_or(scene.years, |y| y as f32);
+    scene.years = years;
+    scene.highlight = crate::world::film::names(args.get("highlight"));
+    let shots = args.get("shots").and_then(Value::as_array);
+    let film = match shots {
+        Some(list) => {
+            let shots = crate::world::film::read_shots(list, |n| scene.place(n), start)?;
+            crate::world::film::Film::new(shots, years)
+        }
+        None => crate::world::film::Film::default(),
+    };
+    let length = film.length();
+    let count = film.shots.len();
+    scene.play(film);
+    let places = scene
+        .places()
+        .iter()
+        .map(|p| format!("{} ({})", p.name, p.what))
+        .collect::<Vec<_>>()
+        .join("; ");
+    let film = if count > 0 {
+        format!("Playing {count} shots, {length:.0} s. ")
+    } else {
+        String::new()
+    };
+    Ok(format!(
+        "{film}The world {name} in panel {id}. Places: {places}. Notes can point at: {}, and the nearest of {}.",
+        crate::world::WorldScene::things().join(", "),
+        crate::world::skin::Layer::names().join(", ")
+    ))
+}
+
 fn annotate(world: &mut World, args: &Value) -> Result<String, String> {
     let id = text(args, "panel").ok_or("which panel?")?;
     let words = text(args, "text").ok_or("what to write?")?;
@@ -1151,8 +1216,19 @@ fn find_place(world: &World, panel: &str, on: &str) -> Result<String, String> {
         s.places.iter().map(|(n, _)| n.clone()).collect()
     } else if let Some(c) = views.cells.get(panel) {
         c.places.iter().map(|(n, _)| n.clone()).collect()
+    } else if world
+        .resource::<crate::world::Worlds>()
+        .map
+        .contains_key(panel)
+    {
+        crate::world::WorldScene::things()
+            .iter()
+            .copied()
+            .chain(crate::world::skin::Layer::names())
+            .map(str::to_owned)
+            .collect()
     } else {
-        return Err("on= points at a part of a drawing, a section or a cell; on a protein, give chain and residue".to_owned());
+        return Err("on= points at a part of a drawing, a section, a cell or a world; on a protein, give chain and residue".to_owned());
     };
     let wanted = story::fold(&bare(on));
     names
@@ -1206,8 +1282,9 @@ fn now() -> u64 {
 }
 
 /// The calls that fill a panel.
-const SHOWS: [&str; 8] = [
+const SHOWS: [&str; 9] = [
     "show_protein",
+    "show_world",
     "show_skin",
     "show_cell",
     "draw",

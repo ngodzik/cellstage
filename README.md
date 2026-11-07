@@ -4,6 +4,10 @@ A window an agent tells biology on, step by step.
 
 cellstage is a [Model Context Protocol](https://modelcontextprotocol.io) server and a window. An agent connected to it, Claude Code in a terminal or any other client, tells a story in steps, and the user moves through them with the arrow keys, as through a course. Each step has a few words, shown under the pictures, and one to six panels showing:
 
+- **worlds in three dimensions, built cell by cell ahead of time, that the agent films** rather than draws. The agent directs: a film of shots, each a place the camera flies to, the words said over it as subtitles, how far the world's clock runs meanwhile, and what stands out while the rest dims. The window renders and plays it, with life moving all the while, and the user can pause it, scrub through it, take the camera and click on cells. The first world is skin:
+  - from a forearm seen at a hand's length, its surface with its lines and pores, through the surface into a core of skin half a millimetre across, every cell in place: the horny, granular, spiny and basal layers of the epidermis, the melanocytes among the basal cells handing pigment up their arms to the keratinocytes, the basement membrane over the rete ridges, the dermis with its collagen, fibroblasts and capillary loops with red cells running through them;
+  - down into one melanocyte's nucleus, its envelope and pores, its chromatin, the string of nucleosomes, and the double helix at codon 600 of BRAF, base pair by base pair: nine orders of magnitude in one move of the camera, each part drawn at the scales it is seen at;
+  - a clock that is the life of a common mole: BRAF mutating in that melanocyte (its T becoming an A on screen), the clone dividing and gathering in nests at the bottoms of the rete ridges while a brown spot grows at the surface, the clone stopping for decades, and the nests sinking into the dermis as the mole grows raised and paler;
 - **drawings the agent writes in SVG**, for anything in the body at any scale. The window adds a house style, so that every drawing speaks the same colours (the germ layers, tissues, organs, cells, molecules), and gives the agent what to draw with:
   - 120 ready-made shapes: cells of every kind (blood and immune cells, neurons and glia, muscle, bone, liver, skin, eggs and early embryos), organelles, molecules (receptors, channels, pumps, kinases, ATP, a chromosome, mRNA, a ribosome at work), microbes;
   - 31 templates of whole things with every part named, set in a drawing with one element: the body and its organs, the brain from the side, at the midline and in a coronal section, the heart, the lungs, the digestive tract, the kidney and a nephron, the eye, a long bone, a block of skin, the spinal cord, the walls of an artery and a vein, the inside of a cell, a synapse, a membrane, DNA from the helix to the chromosome, a sarcomere, a liver lobule, the gut wall, an alveolus, a lymph node, the marrow, a pancreatic islet, a thyroid follicle, a tumour among its neighbours, and the embryo from the egg to four weeks;
@@ -31,7 +35,7 @@ Every panel carries a label, so that a drawing is never taken for a measurement 
 - **measured structure**: atoms where X-ray crystallography or cryo-electron microscopy placed them; the colours are chosen.
 - **predicted structure**: atoms where AlphaFold predicts them, never measured; the agent is told which stretches are predicted with low confidence.
 - **simulation**: protein levels and fate computed by cellweave's network; how the cell looks, its outline and organelles and the microscope's optics, is drawn.
-- **illustration** or **schematic**: a section drawn from what histology describes, a drawing or a diagram of the agent's; none is simulated.
+- **illustration** or **schematic**: a world built from what histology describes, a section drawn from it, a drawing or a diagram of the agent's; none is simulated. A world's mole grows along the course the textbooks describe, laid out ahead of time, not computed.
 - **chart**: numbers the agent gave, with the source it named.
 - **text**: words the agent wrote.
 - **picture**: a file from Wikimedia Commons, with its author and licence.
@@ -62,6 +66,7 @@ Then, in a new Claude Code session, ask for something to be shown or explained. 
 | `story_new`, `story_step` | begins a story; adds a step after the one on screen, empty or with the same panels |
 | `story_edit`, `story_goto`, `story_remove_step` | changes a step's words, shows a step, removes one |
 | `stage_layout` | splits the step into one to six panels, side by side, stacked, or in a grid |
+| `show_world` | a 3D world in a panel, and the film the agent directs in it: places, words, the world's clock, what stands out |
 | `draw` | an SVG drawing in a panel, still or moving, with templates and shorthands; kept in the library when named |
 | `drawing_kit` | the house classes, shapes, templates and shorthands, in words and as pictures; a template's parts |
 | `show_diagram` | a pathway, a lineage or a sequence of events, laid out from nodes and edges |

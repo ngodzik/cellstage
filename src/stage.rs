@@ -51,6 +51,9 @@ pub enum Kind {
     Skin,
     /// A drawing the agent wrote.
     Drawing,
+    /// A world in three dimensions, built ahead of time, that the agent
+    /// films.
+    World,
 }
 
 impl Kind {
@@ -63,6 +66,7 @@ impl Kind {
             Kind::Cell => "SIMULATION · cellweave's network; the cell's look is drawn",
             Kind::Skin => "ILLUSTRATION · drawn from histology, not simulated",
             Kind::Drawing => "ILLUSTRATION · a schematic drawn by the agent",
+            Kind::World => "ILLUSTRATION · a 3D world built from histology, not a simulation",
         }
     }
 
@@ -72,6 +76,7 @@ impl Kind {
             Kind::Cell => egui::Color32::from_rgb(120, 225, 160),
             Kind::Skin => egui::Color32::from_rgb(245, 180, 110),
             Kind::Drawing => egui::Color32::from_rgb(240, 200, 120),
+            Kind::World => egui::Color32::from_rgb(190, 160, 255),
             Kind::Empty => egui::Color32::GRAY,
         }
     }

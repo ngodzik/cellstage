@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 
 use crate::cell::dish::GENES;
 use crate::tissue::skin::Lesion;
+use crate::world;
 
 /// A tool call, handed to the window, and where to send its answer.
 pub struct Call {
@@ -143,6 +144,7 @@ const INSTRUCTIONS: &str = "\
 cellstage is a window beside this conversation where you tell the user biology as a story in pictures, step by step, and the user moves through the steps with the arrow keys, turning, zooming and clicking what is shown. Anything in the body can be shown, at every scale: the body and its organs, tissues, cells, molecules, the embryo, microbes; pathways and lineages; numbers; real pictures.
 
 What you can put in a panel:
+- show_world: a world built in three dimensions ahead of time, cell by cell, that you film rather than draw. You direct: shots, each a place the camera flies to across scales, the words said over it as subtitles, how far the world's clock runs meanwhile, what stands out; the window renders it as a film, with life moving all the while. This is far richer than anything drawn: whenever the subject is in a world, film it there, in one large panel, and draw only what no world shows. There is one world for now, skin, from a forearm down to the DNA of one melanocyte, whose clock is the life of a common mole (see the tool).
 - draw: a drawing you write in SVG, with the house style. drawing_kit (once per conversation) gives you 120 ready-made shapes (cells of every kind, organelles, molecules, microbes, eggs and embryos), 31 templates of whole things with their parts named (the body, the brain in three views, the heart, lungs, kidney and nephron, eye, bone, skin, spinal cord, the inside of a cell, a synapse, a membrane, DNA packaging, a sarcomere, liver, gut wall, alveolus, lymph node, marrow, islet, thyroid, a tumour's surroundings, and the embryo from the egg to four weeks), and shorthands that scatter shapes over a region, set them in a ring, a row, a grid or along a path, or draw a lipid bilayer or a double helix along any path. Start from a template and add to it, rather than drawing an organ from nothing.
 - show_diagram: a pathway, a lineage, a cascade, a cycle, a sequence of events, as nodes and edges; the window lays it out. Nodes can be house shapes, for a lineage of cells.
 - show_chart: numbers as lines, areas, bars or points, always with where they come from.
@@ -156,7 +158,7 @@ How to work:
 2. Otherwise story_new, then build the story one step at a time. Each step has a title and a narration of one to three short sentences shown under the pictures; then lay the step out (stage_layout, one to six panels; one large panel is often best) and fill its panels. story_step adds the next step; keep_panels carries the panels over so you change only what moves on.
 3. Everything you show is kept in the step on screen as you go. Every answer ends with where you are, [story, step k of n]. If the user moved to another step, your calls change that step.
 4. To show something changing (the neural tube closing, cells migrating, a heart beating, a tumour growing), give draw changes: each further frame as what changes from the one before, {id: {attribute: value}}; the window moves smoothly between them. A drawing, diagram or chart that comes back in the next step with numbers changed also moves into it. Name a drawing worth reusing, so it is kept in the library.
-5. annotate with on=<part> to point at a named part of a drawing, a template, a diagram's node, a section or a cell (the answers list them), or chain and residue on a protein: the window places the note itself. Avoid coordinates and avoid checking with screenshot after every call; one screenshot when a new layout is done is enough.
+5. annotate with on=<part> to point at a named part of a drawing, a template, a diagram's node, a section, a cell or a world (the answers list them), or chain and residue on a protein: the window places the note itself. Avoid coordinates and avoid checking with screenshot after every call; one screenshot when a new layout is done is enough.
 6. Every panel is labelled by what it is: a measured structure, a predicted structure, a simulation, an illustration or schematic, a chart of numbers you gave, a picture with its author and licence. Never present an illustration as a measurement or a simulation result, and never make up numbers for a chart without saying so in its source.
 7. get_user_events tells you what the user clicked and which step they moved to. Call it when they refer to something in the window.
 The story carries the pictures and the short words; the teaching, the longer explanations and any revision are yours, in the conversation.";
@@ -467,6 +469,41 @@ fn tools() -> Value {
                     "caption": {"type": "string"}
                 },
                 "required": ["panel", "stage"]
+            }
+        },
+        {
+            "name": "show_world",
+            "description": "Film a world built in 3D ahead of time instead of drawing: you direct, the window renders and plays it. The skin world: a forearm's skin seen from a hand's length (place arm), its surface close up with its lines, pores and the mole (mole), through the surface into a core of skin cell by cell (skin, epidermis): the horny, granular, spiny and basal layers, melanocytes among the basal cells handing pigment up their arms, the basement membrane and its rete ridges (underneath), the dermis with collagen, fibroblasts and capillary loops with red cells running (dermis, capillary); down into the first melanocyte (melanocyte), its nucleus (nucleus), chromatin (chromatin), nucleosomes (nucleosomes) and the double helix at codon 600 of BRAF (dna). The world's clock, in years, is the life of a common mole: below 0, normal skin; at 0, BRAF mutates in the first melanocyte (at the DNA its T becomes an A, GTG to GAG, valine 600 to glutamate); 0 to 7, the melanocyte rounds up, its clone divides and gathers in nests at the bottoms of the rete ridges (a junctional naevus; a brown spot grows at the surface); 7 to 9.5, it stops dividing for decades (senescence set off by BRAF's own signal; the nuclei change colour); 15 to 50, the nests sink into the dermis and their cells shrink (compound, then intradermal naevus; the mole raised and paler). Give a film as shots: each goes to a place, or stays where the last left the camera; lasts some seconds; says one or two short sentences over it, in the user's language; may run the clock to years by its end; may set apart what to look at, dimming the rest. The camera flies between places along a smooth path across scales: from the arm to the DNA is one move of a few seconds. A film of 6 to 15 shots is usually a whole step; the step's narration can stay short. The user can pause (space), replay, scrub, take the camera with the mouse and click on cells, which get_user_events reports. The answer lists the places, and the things annotate can point at.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "panel": {"type": "string"},
+                    "world": {"type": "string", "enum": world::NAMES, "default": "skin"},
+                    "place": {"type": "string", "enum": world::PLACES, "description": "Where the camera starts; by default where it was, or the skin."},
+                    "years": {"type": "number", "description": "The clock at the start; -1 (before the mutation) by default."},
+                    "highlight": {"type": "array", "items": {"type": "string", "enum": world::highlights()}, "description": "What to set apart when no film says otherwise."},
+                    "shots": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "place": {"type": "string", "enum": world::PLACES},
+                                "seconds": {"type": "number", "description": "How long the shot lasts, the camera's travel included; by default the travel and 4 s. Leave time to read what is said."},
+                                "say": {"type": "string", "description": "A subtitle over the shot: one or two short sentences."},
+                                "years": {"type": "number", "description": "The clock at the end of the shot; it runs there while the camera stays."},
+                                "highlight": {"type": "array", "items": {"type": "string", "enum": world::highlights()}, "description": "What to set apart; the rest dims. braf_codon_600 sets the mutated base pair apart in the helix."},
+                                "distance": {"type": "number", "description": "Micrometres from what the place looks at, to come closer or stand back."},
+                                "turn": {"type": "number", "description": "Degrees to turn about what the place looks at."},
+                                "tilt": {"type": "number", "description": "Degrees above the horizontal to look from; negative looks from below."},
+                                "travel": {"type": "number", "description": "Seconds to get there; chosen by how far it is when not given."},
+                                "drift": {"type": "number", "description": "Degrees a second the camera turns while it stays; 3 by default, 0 to stay still."}
+                            }
+                        }
+                    },
+                    "title": {"type": "string"},
+                    "caption": {"type": "string"}
+                },
+                "required": ["panel"]
             }
         },
         {
