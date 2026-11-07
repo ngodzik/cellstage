@@ -1,9 +1,15 @@
-//! The stage: the window split into panels, each with a title, a label
-//! saying what kind of thing it shows, a caption, the agent's notes, and
-//! what the user clicks on it.
+//! The stage: the story being told, the step on screen, and the window
+//! split into that step's panels, each with a title, a label saying what
+//! kind of thing it shows, a caption, the agent's notes, and what the user
+//! clicks on it.
 
 use bevy::prelude::*;
 use bevy_egui::egui;
+
+use crate::story::{Call, Story};
+
+/// The most panels a step shows at once.
+pub const MAX_PANELS: usize = 6;
 
 /// How the panels share the window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -12,6 +18,24 @@ pub enum Arrangement {
     Columns,
     Rows,
     Grid,
+}
+
+impl Arrangement {
+    pub fn parse(name: &str) -> Self {
+        match name {
+            "rows" => Arrangement::Rows,
+            "grid" => Arrangement::Grid,
+            _ => Arrangement::Columns,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Arrangement::Columns => "columns",
+            Arrangement::Rows => "rows",
+            Arrangement::Grid => "grid",
+        }
+    }
 }
 
 /// What kind of thing a panel shows, which its label says.
@@ -25,6 +49,8 @@ pub enum Kind {
     Cell,
     /// A tissue drawn from what histology describes.
     Skin,
+    /// A drawing the agent wrote.
+    Drawing,
 }
 
 impl Kind {
@@ -36,26 +62,41 @@ impl Kind {
             Kind::Protein => "MEASURED STRUCTURE",
             Kind::Cell => "SIMULATION · cellweave's network; the cell's look is drawn",
             Kind::Skin => "ILLUSTRATION · drawn from histology, not simulated",
+            Kind::Drawing => "ILLUSTRATION · a schematic drawn by the agent",
+        }
+    }
+
+    fn colour(self) -> egui::Color32 {
+        match self {
+            Kind::Protein => egui::Color32::from_rgb(120, 190, 255),
+            Kind::Cell => egui::Color32::from_rgb(120, 225, 160),
+            Kind::Skin => egui::Color32::from_rgb(245, 180, 110),
+            Kind::Drawing => egui::Color32::from_rgb(240, 200, 120),
+            Kind::Empty => egui::Color32::GRAY,
         }
     }
 }
 
-/// Where a note is pinned.
+/// What a note points at.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Anchor {
     /// Fractions of the panel's width and height from its top left.
     Fraction(f32, f32),
     /// A residue of a protein, followed as the protein turns.
     Residue(char, i32),
+    /// A named part: of a drawing, a section, a cell.
+    Part(String),
 }
 
 /// A note the agent wrote on a panel.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Note {
     pub text: String,
-    pub at: Anchor,
-    /// A point the note points to, as fractions of the panel.
-    pub arrow_to: Option<(f32, f32)>,
+    /// What it points at, with an arrow; nothing for a note that only sits.
+    pub target: Option<Anchor>,
+    /// Where its words sit, as fractions of the panel; chosen by the window
+    /// when not given.
+    pub label: Option<(f32, f32)>,
 }
 
 /// One panel.
@@ -67,6 +108,9 @@ pub struct Panel {
     pub source: String,
     pub kind: Kind,
     pub notes: Vec<Note>,
+    /// The call whose result it shows, to know whether a step needs it
+    /// made again.
+    pub shown: Option<Call>,
     /// Where it is on screen, in logical points, as last laid out.
     pub rect: egui::Rect,
     /// The image a 2D panel shows, and its egui texture.
@@ -87,6 +131,7 @@ impl Panel {
             source: String::new(),
             kind: Kind::Empty,
             notes: Vec::new(),
+            shown: None,
             rect: egui::Rect::NOTHING,
             image: None,
             texture: None,
@@ -119,26 +164,70 @@ const CAPTION: f32 = 58.0;
 const GAP: f32 = 6.0;
 
 /// The whole stage.
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct Stage {
     pub panels: Vec<Panel>,
     pub arrangement: Arrangement,
-    /// What the user clicked, in words, since the agent last asked.
+    /// The story being told, and the step on screen.
+    pub story: Option<Story>,
+    pub step: usize,
+    /// A step the user asked for, and a story the user opened, for the
+    /// stage to show at its next turn.
+    pub goto: Option<usize>,
+    pub open: Option<String>,
+    /// Whether the story has changed since it was last written to disk.
+    pub dirty: bool,
+    /// Whether the library is open in the window.
+    pub library: bool,
+    /// What the user did, in words, since the agent last asked.
     pub events: Vec<String>,
     /// Whether the window has been shown yet.
     pub shown: bool,
+    /// Physical pixels to a logical point, as egui last said.
+    pub pixels_per_point: f32,
+}
+
+impl Default for Stage {
+    fn default() -> Self {
+        Self {
+            panels: Vec::new(),
+            arrangement: Arrangement::Columns,
+            story: None,
+            step: 0,
+            goto: None,
+            open: None,
+            dirty: false,
+            library: false,
+            events: Vec::new(),
+            shown: false,
+            pixels_per_point: 1.0,
+        }
+    }
 }
 
 impl Stage {
     /// The panel with this id, made if there is none and there is room.
     pub fn panel(&mut self, id: &str) -> Option<&mut Panel> {
         if !self.panels.iter().any(|p| p.id == id) {
-            if self.panels.len() >= 4 {
+            if self.panels.len() >= MAX_PANELS {
                 return None;
             }
             self.panels.push(Panel::new(id, id));
         }
         self.panels.iter_mut().find(|p| p.id == id)
+    }
+
+    /// Where the story is, in words: "step 2 of 5".
+    pub fn whereabouts(&self) -> String {
+        match &self.story {
+            Some(s) => format!(
+                "[story {}, step {} of {}]",
+                s.id,
+                self.step + 1,
+                s.steps.len()
+            ),
+            None => String::new(),
+        }
     }
 
     /// Lay the panels out in `area`.
@@ -149,6 +238,7 @@ impl Stage {
         }
         let (columns, rows) = match (self.arrangement, n) {
             (Arrangement::Rows, n) => (1, n),
+            (Arrangement::Grid, n) if n > 4 => (3, n.div_ceil(3)),
             (Arrangement::Grid, n) if n > 2 => (2, n.div_ceil(2)),
             (_, n) => (n, 1),
         };
@@ -197,12 +287,6 @@ pub fn frame(painter: &egui::Painter, panel: &Panel, solid: bool) {
         egui::FontId::proportional(17.0),
         egui::Color32::from_rgb(232, 234, 240),
     );
-    let colour = match panel.kind {
-        Kind::Protein => egui::Color32::from_rgb(120, 190, 255),
-        Kind::Cell => egui::Color32::from_rgb(120, 225, 160),
-        Kind::Skin => egui::Color32::from_rgb(245, 180, 110),
-        Kind::Empty => egui::Color32::GRAY,
-    };
     let label = if panel.source.is_empty() {
         panel.kind.label().to_owned()
     } else {
@@ -213,7 +297,7 @@ pub fn frame(painter: &egui::Painter, panel: &Panel, solid: bool) {
         egui::Align2::LEFT_TOP,
         label,
         egui::FontId::proportional(11.5),
-        colour,
+        panel.kind.colour(),
     );
     if !panel.caption.is_empty() {
         let galley = painter.layout(
@@ -230,38 +314,103 @@ pub fn frame(painter: &egui::Painter, panel: &Panel, solid: bool) {
     }
 }
 
-/// Draw a note, a dark label with an optional arrow.
-pub fn note(painter: &egui::Painter, at: egui::Pos2, text: &str, arrow_to: Option<egui::Pos2>) {
-    let ink = egui::Color32::from_rgb(255, 236, 160);
-    if let Some(to) = arrow_to {
-        painter.arrow(at, to - at, egui::Stroke::new(2.0, ink));
-    }
-    let galley = painter.layout(
+const INK: egui::Color32 = egui::Color32::from_rgb(255, 236, 160);
+
+/// The size of a note's words as drawn.
+fn note_galley(painter: &egui::Painter, text: &str) -> std::sync::Arc<egui::Galley> {
+    painter.layout(
         text.to_owned(),
         egui::FontId::proportional(14.0),
-        ink,
-        260.0,
-    );
-    let rect =
-        egui::Rect::from_min_size(at + egui::vec2(6.0, -galley.size().y - 4.0), galley.size())
-            .expand(4.0);
+        INK,
+        240.0,
+    )
+}
+
+/// Where a note's words go when the agent did not say: away from the
+/// middle of the panel, beside what it points at, clear of the notes
+/// already placed.
+pub fn place_label(
+    painter: &egui::Painter,
+    text: &str,
+    target: egui::Pos2,
+    area: egui::Rect,
+    taken: &[egui::Rect],
+) -> egui::Rect {
+    let size = note_galley(painter, text).size() + egui::vec2(10.0, 8.0);
+    let away = target - area.center();
+    let base = if away.length() < 20.0 {
+        -std::f32::consts::FRAC_PI_4 * 3.0
+    } else {
+        away.y.atan2(away.x)
+    };
+    let mut first = None;
+    for (k, turn) in [
+        0.0f32,
+        0.6,
+        -0.6,
+        1.2,
+        -1.2,
+        1.9,
+        -1.9,
+        2.6,
+        -2.6,
+        std::f32::consts::PI,
+    ]
+    .iter()
+    .enumerate()
+    {
+        let reach = 70.0 + 18.0 * (k / 2) as f32;
+        let a = base + turn;
+        let centre =
+            target + egui::vec2(a.cos(), a.sin()) * (reach + size.x * 0.35 * a.cos().abs());
+        let mut rect = egui::Rect::from_center_size(centre, size);
+        // Kept inside the panel.
+        let dx = (area.left() - rect.left()).max(0.0) + (area.right() - rect.right()).min(0.0);
+        let dy = (area.top() - rect.top()).max(0.0) + (area.bottom() - rect.bottom()).min(0.0);
+        rect = rect.translate(egui::vec2(dx, dy));
+        if rect.contains(target) {
+            continue;
+        }
+        if !taken.iter().any(|t| t.expand(4.0).intersects(rect)) {
+            return rect;
+        }
+        first.get_or_insert(rect);
+    }
+    first.unwrap_or_else(|| egui::Rect::from_min_size(area.min + egui::vec2(8.0, 8.0), size))
+}
+
+/// The box a note's words take when they sit at a point.
+pub fn label_at(painter: &egui::Painter, text: &str, at: egui::Pos2) -> egui::Rect {
+    let size = note_galley(painter, text).size() + egui::vec2(10.0, 8.0);
+    egui::Rect::from_min_size(at, size)
+}
+
+/// Draw a note: its words in a dark box, and an arrow from the box to what
+/// it points at.
+pub fn note(painter: &egui::Painter, rect: egui::Rect, text: &str, target: Option<egui::Pos2>) {
+    if let Some(to) = target {
+        let from = egui::pos2(
+            to.x.clamp(rect.left(), rect.right()),
+            to.y.clamp(rect.top(), rect.bottom()),
+        );
+        if from.distance(to) > 6.0 {
+            painter.arrow(from, to - from, egui::Stroke::new(2.0, INK));
+        }
+        painter.circle_filled(to, 3.0, INK);
+    }
     painter.rect_filled(
         rect,
         3.0,
-        egui::Color32::from_rgba_unmultiplied(0, 0, 0, 190),
+        egui::Color32::from_rgba_unmultiplied(0, 0, 0, 200),
     );
-    painter.galley(rect.min + egui::vec2(4.0, 4.0), galley, ink);
+    let galley = note_galley(painter, text);
+    painter.galley(rect.min + egui::vec2(5.0, 4.0), galley, INK);
 }
 
-/// Where an image of `size` pixels sits in `area`, kept in proportion, at
-/// a zoom and a pan.
-pub fn image_rect(
-    area: egui::Rect,
-    size: (usize, usize),
-    zoom: f32,
-    pan: egui::Vec2,
-) -> egui::Rect {
-    let (w, h) = (size.0 as f32, size.1 as f32);
+/// Where an image of `size` sits in `area`, kept in proportion, at a zoom
+/// and a pan.
+pub fn image_rect(area: egui::Rect, size: (f32, f32), zoom: f32, pan: egui::Vec2) -> egui::Rect {
+    let (w, h) = size;
     let fit = (area.width() / w).min(area.height() / h) * zoom;
     let size = egui::vec2(w, h) * fit;
     let centre = area.center() - egui::vec2(pan.x * size.x, pan.y * size.y);

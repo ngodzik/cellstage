@@ -1,0 +1,115 @@
+/* The house style: what a class looks like, so that every drawing of a
+   story speaks the same colours. Gradients, patterns, filters and markers
+   are in house.svg. */
+
+/* Text */
+text { font-family: Noto Sans, DejaVu Sans, sans-serif; fill: #2b2d33; }
+.label { font-size: 24px; }
+.title { font-size: 34px; font-weight: bold; }
+.small { font-size: 18px; }
+.light { fill: #ffffff; }
+.muted { fill: #6b6f7a; }
+
+/* Lines */
+.arrow { fill: none; stroke: #2b2d33; stroke-width: 3; marker-end: url(#h-arrow); }
+.arrow-red { fill: none; stroke: #c62828; stroke-width: 3.5; marker-end: url(#h-arrow-red); }
+.arrow-white { fill: none; stroke: #ffffff; stroke-width: 3; marker-end: url(#h-arrow-white); }
+.inhibit { fill: none; stroke: #2b2d33; stroke-width: 3; marker-end: url(#h-bar); }
+.line { fill: none; stroke: #2b2d33; stroke-width: 2; }
+.dashed { stroke-dasharray: 9 7; }
+.path-route { fill: none; stroke: #3faa5a; stroke-width: 4; stroke-dasharray: 2 10; stroke-linecap: round; }
+
+/* Effects */
+.shadow { filter: url(#h-shadow); }
+.glow { filter: url(#h-glow); }
+.blur { filter: url(#h-blur); }
+.faint { opacity: 0.35; }
+.halo { fill: url(#h-halo); stroke: none; }
+.outline { fill: none; stroke: #ffd23f; stroke-width: 4; }
+
+/* A cell and what is in it */
+.cell { fill: url(#h-cyto); stroke: #c98b74; stroke-width: 2.5; }
+.membrane { fill: none; stroke: #c98b74; stroke-width: 4; }
+.membrane-band { fill: #f3d9a6; stroke: #c9a15a; stroke-width: 1.5; }
+.cytoplasm { fill: url(#h-cyto); }
+.nucleus { fill: url(#h-nucleus); stroke: #6b4fae; stroke-width: 1.5; }
+.nucleus-dark { fill: url(#h-nucleus-dark); stroke: #43277a; stroke-width: 1.2; }
+.nucleolus { fill: #4b2f86; }
+.mito { fill: url(#h-mito); stroke: #b8452a; stroke-width: 1.5; }
+.er { fill: none; stroke: #7fa7d9; stroke-width: 2.2; stroke-linecap: round; }
+.golgi { fill: none; stroke: #e2a33b; stroke-width: 2.6; stroke-linecap: round; }
+.vesicle { fill: #fff3d6; stroke: #e2a33b; stroke-width: 1.5; }
+.lysosome { fill: #e9c9f2; stroke: #a35bbf; stroke-width: 1.5; }
+.melanin { fill: url(#h-melanin); }
+.melanosome { fill: #5a3418; }
+.dying { fill: #f1d2c4; stroke: #b07a68; stroke-width: 2; }
+.tumour-cell { fill: url(#h-tumour); stroke: #86406f; stroke-width: 2.5; }
+.lipid { fill: url(#h-lipid); stroke: #e3c66f; stroke-width: 1.2; }
+
+/* Cells by kind */
+.melanocyte-body { fill: url(#h-melanocyte); stroke: #9b6a45; stroke-width: 2; }
+.dendrite-edge { fill: none; stroke: #9b6a45; stroke-width: 9; stroke-linecap: round; }
+.dendrite { fill: none; stroke: #e9c7a6; stroke-width: 6; stroke-linecap: round; }
+.crest-cell { fill: url(#h-crest); stroke: #2c8446; stroke-width: 2; }
+.neuron-body { fill: url(#h-neuron); stroke: #b07a1c; stroke-width: 2; }
+.neurite-edge { fill: none; stroke: #b07a1c; stroke-width: 7; stroke-linecap: round; }
+.neurite { fill: none; stroke: #f0c35e; stroke-width: 4.5; stroke-linecap: round; }
+.myelin { fill: #fdf6e6; stroke: #c9b48a; stroke-width: 1.5; }
+.rbc { fill: url(#h-rbc); stroke: #7d0c10; stroke-width: 1; }
+.wbc { fill: url(#h-wbc); stroke: #9a90c9; stroke-width: 1.5; }
+.platelet { fill: #c39ae0; stroke: #7a4fa0; stroke-width: 1; }
+.blast { fill: url(#h-blast); stroke: #5d74b8; stroke-width: 1.5; }
+.macrophage { fill: url(#h-macrophage); stroke: #a88563; stroke-width: 2; }
+
+/* The embryo: the usual colours of the germ layers */
+.ectoderm { fill: url(#h-ectoderm); stroke: #3b78bd; stroke-width: 2; }
+.neural { fill: url(#h-neural); stroke: #2f3a99; stroke-width: 2; }
+.neural-crest { fill: url(#h-crest); stroke: #2c8446; stroke-width: 2; }
+.mesoderm { fill: url(#h-mesoderm); stroke: #b8443d; stroke-width: 2; }
+.somite { fill: url(#h-somite); stroke: #93302a; stroke-width: 2; }
+.notochord { fill: url(#h-notochord); stroke: #b0538a; stroke-width: 2; }
+.endoderm { fill: url(#h-endoderm); stroke: #c9981c; stroke-width: 2; }
+.yolk { fill: url(#h-yolk); stroke: #d9b960; stroke-width: 2; }
+.amnion { fill: url(#h-amnion); stroke: #8cb8d8; stroke-width: 2; }
+
+/* Tissues */
+.epidermis { fill: url(#h-epidermis); stroke: #c98b6a; stroke-width: 2; }
+.dermis { fill: url(#h-collagen); stroke: #e0a995; stroke-width: 1.5; }
+.dermis-plain { fill: url(#h-dermis); }
+.fat { fill: url(#h-fat-cells); stroke: #e5c97a; stroke-width: 1.5; }
+.muscle { fill: url(#h-striated); stroke: #a8403a; stroke-width: 2; }
+.bone { fill: url(#h-bone); stroke: #b9a678; stroke-width: 2; }
+.cartilage { fill: url(#h-cartilage); stroke: #8aa3bf; stroke-width: 2; }
+.basement { fill: none; stroke: #b0538a; stroke-width: 3; }
+.artery { fill: url(#h-artery); stroke: #922a20; stroke-width: 2; }
+.vein { fill: url(#h-vein); stroke: #34438a; stroke-width: 2; }
+.vessel-wall { fill: url(#h-artery); stroke: #922a20; stroke-width: 2; }
+.blood { fill: url(#h-blood); }
+.lymph { fill: #eaf4d9; stroke: #8fb35a; stroke-width: 2; }
+.nerve { fill: url(#h-nerve); stroke: #b8901f; stroke-width: 2; }
+
+/* Organs */
+.grey-matter { fill: url(#h-grey-matter); stroke: #9c7f7a; stroke-width: 2; }
+.white-matter { fill: url(#h-white-matter); stroke: #c9b9a2; stroke-width: 1.5; }
+.csf { fill: #dff1fb; stroke: #8cc3e3; stroke-width: 1.5; }
+.liver { fill: url(#h-liver); stroke: #6e2d20; stroke-width: 2; }
+.lung { fill: url(#h-lung); stroke: #b85f5f; stroke-width: 2; }
+.heart { fill: url(#h-heart); stroke: #7c2121; stroke-width: 2; }
+.kidney { fill: url(#h-kidney); stroke: #6b2a20; stroke-width: 2; }
+.gut { fill: url(#h-gut); stroke: #b86f53; stroke-width: 2; }
+.marrow { fill: url(#h-marrow); stroke: #a84c45; stroke-width: 2; }
+.skin-surface { fill: url(#h-epidermis); stroke: #c98b6a; stroke-width: 2; }
+
+/* Molecules */
+.protein { fill: url(#h-protein); stroke: #2f5ea8; stroke-width: 1.5; }
+.receptor { fill: url(#h-receptor); stroke: #1f7556; stroke-width: 1.5; }
+.ligand { fill: url(#h-ligand); stroke: #b8620f; stroke-width: 1.5; }
+.dna-strand { fill: none; stroke: #3d73cf; stroke-width: 4; stroke-linecap: round; }
+.dna-strand-2 { fill: none; stroke: #e05a5a; stroke-width: 4; stroke-linecap: round; }
+.dna-rung { fill: none; stroke: #9aa3b5; stroke-width: 2.5; }
+.antibody-edge { fill: none; stroke: #a87a10; stroke-width: 8; stroke-linecap: round; }
+.antibody { fill: none; stroke: #ffd766; stroke-width: 5; stroke-linecap: round; }
+
+/* Microbes */
+.virus { fill: url(#h-virus); stroke: #3d7f30; stroke-width: 2; }
+.bacterium { fill: url(#h-bacterium); stroke: #6e8231; stroke-width: 2; }

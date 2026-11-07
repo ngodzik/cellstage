@@ -1,0 +1,153 @@
+<!-- Gradients -->
+<radialGradient id="h-cyto" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#fff7f0"/><stop offset="0.7" stop-color="#f8dccc"/><stop offset="1" stop-color="#efc2ab"/></radialGradient>
+<radialGradient id="h-nucleus" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#e0d3f6"/><stop offset="1" stop-color="#8a69c8"/></radialGradient>
+<radialGradient id="h-nucleus-dark" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#b49ae4"/><stop offset="1" stop-color="#553592"/></radialGradient>
+<radialGradient id="h-mito" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#ffc29e"/><stop offset="1" stop-color="#dd5d36"/></radialGradient>
+<radialGradient id="h-rbc" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#f4b3b0"/><stop offset="0.32" stop-color="#e57373"/><stop offset="0.68" stop-color="#c62828"/><stop offset="0.9" stop-color="#a3161c"/><stop offset="1" stop-color="#7f0d12"/></radialGradient>
+<radialGradient id="h-wbc" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#f7f5fd"/><stop offset="1" stop-color="#d3cdee"/></radialGradient>
+<radialGradient id="h-melanin" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#94643c"/><stop offset="1" stop-color="#3f230f"/></radialGradient>
+<radialGradient id="h-melanocyte" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#f2d6bb"/><stop offset="1" stop-color="#c48d62"/></radialGradient>
+<linearGradient id="h-ectoderm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3d6f4"/><stop offset="1" stop-color="#5b9be0"/></linearGradient>
+<linearGradient id="h-neural" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9aa7f5"/><stop offset="1" stop-color="#4654c4"/></linearGradient>
+<radialGradient id="h-crest" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#b4f0c0"/><stop offset="1" stop-color="#3faa5a"/></radialGradient>
+<linearGradient id="h-mesoderm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f9c1bc"/><stop offset="1" stop-color="#de645c"/></linearGradient>
+<radialGradient id="h-somite" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#f4a7a1"/><stop offset="1" stop-color="#bf433c"/></radialGradient>
+<radialGradient id="h-notochord" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#fcd9ec"/><stop offset="1" stop-color="#d977ae"/></radialGradient>
+<linearGradient id="h-endoderm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2bd"/><stop offset="1" stop-color="#f0c443"/></linearGradient>
+<radialGradient id="h-yolk" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#fffbe8"/><stop offset="1" stop-color="#f4dc94"/></radialGradient>
+<radialGradient id="h-amnion" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#eef7fd"/><stop offset="1" stop-color="#cfe6f6"/></radialGradient>
+<linearGradient id="h-epidermis" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7dccb"/><stop offset="1" stop-color="#e5ac8b"/></linearGradient>
+<linearGradient id="h-dermis" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcede6"/><stop offset="1" stop-color="#f4d2c4"/></linearGradient>
+<radialGradient id="h-fat" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#fffbe4"/><stop offset="1" stop-color="#f5dc8e"/></radialGradient>
+<linearGradient id="h-muscle" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ef948d"/><stop offset="1" stop-color="#bf4e48"/></linearGradient>
+<linearGradient id="h-bone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdf9ee"/><stop offset="1" stop-color="#e6d6ae"/></linearGradient>
+<linearGradient id="h-cartilage" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#edf3f9"/><stop offset="1" stop-color="#b9cde2"/></linearGradient>
+<linearGradient id="h-artery" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f39191"/><stop offset="1" stop-color="#bd3a2c"/></linearGradient>
+<linearGradient id="h-vein" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9caeea"/><stop offset="1" stop-color="#4859b2"/></linearGradient>
+<radialGradient id="h-blood" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#dc4848"/><stop offset="1" stop-color="#961919"/></radialGradient>
+<linearGradient id="h-nerve" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3bb"/><stop offset="1" stop-color="#eebd3d"/></linearGradient>
+<radialGradient id="h-neuron" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#fbe2a4"/><stop offset="1" stop-color="#dea033"/></radialGradient>
+<radialGradient id="h-grey-matter" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#e8d9d6"/><stop offset="1" stop-color="#c2a7a3"/></radialGradient>
+<radialGradient id="h-white-matter" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#fdf9f2"/><stop offset="1" stop-color="#ebdecb"/></radialGradient>
+<radialGradient id="h-liver" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#d27a62"/><stop offset="1" stop-color="#913e2c"/></radialGradient>
+<radialGradient id="h-lung" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#fbd0d0"/><stop offset="1" stop-color="#e48585"/></radialGradient>
+<radialGradient id="h-heart" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#e67474"/><stop offset="1" stop-color="#a42f2f"/></radialGradient>
+<radialGradient id="h-kidney" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#cc7565"/><stop offset="1" stop-color="#89392d"/></radialGradient>
+<radialGradient id="h-gut" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#fad3c1"/><stop offset="1" stop-color="#e09678"/></radialGradient>
+<radialGradient id="h-marrow" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#f7c0ba"/><stop offset="1" stop-color="#d56f67"/></radialGradient>
+<radialGradient id="h-protein" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#b5d0fa"/><stop offset="1" stop-color="#4479d3"/></radialGradient>
+<radialGradient id="h-receptor" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#9ee0c7"/><stop offset="1" stop-color="#2b9a73"/></radialGradient>
+<radialGradient id="h-ligand" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#ffd09a"/><stop offset="1" stop-color="#ec8420"/></radialGradient>
+<radialGradient id="h-tumour" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#ecc6e0"/><stop offset="1" stop-color="#a95592"/></radialGradient>
+<radialGradient id="h-virus" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#c2e9b4"/><stop offset="1" stop-color="#53a443"/></radialGradient>
+<radialGradient id="h-bacterium" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#e2efb0"/><stop offset="1" stop-color="#98b545"/></radialGradient>
+<radialGradient id="h-antibody" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#ffe6a0"/><stop offset="1" stop-color="#d9a11c"/></radialGradient>
+<radialGradient id="h-blast" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#c8d5f5"/><stop offset="1" stop-color="#8197d6"/></radialGradient>
+<radialGradient id="h-macrophage" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#f5eee6"/><stop offset="1" stop-color="#d8c3ab"/></radialGradient>
+<radialGradient id="h-lipid" cx="0.38" cy="0.32" r="0.8"><stop offset="0" stop-color="#fffdf0"/><stop offset="1" stop-color="#f8e7a8"/></radialGradient>
+<radialGradient id="h-halo" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff59a" stop-opacity="0.9"/><stop offset="1" stop-color="#ffd23f" stop-opacity="0"/></radialGradient>
+<!-- Patterns -->
+<pattern id="h-collagen" width="80" height="26" patternUnits="userSpaceOnUse"><rect width="80" height="26" fill="#fbe9e1"/><path d="M0 6 C 20 1, 40 11, 60 6 S 80 4, 80 6 M0 19 C 20 14, 40 24, 60 19 S 80 17, 80 19" fill="none" stroke="#efb8a6" stroke-width="2.2"/></pattern>
+<pattern id="h-striated" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#e57d76"/><rect width="4" height="12" fill="#c4544e"/></pattern>
+<pattern id="h-fat-cells" width="46" height="40" patternUnits="userSpaceOnUse"><rect width="46" height="40" fill="#fff6d6"/><circle cx="12" cy="11" r="11" fill="#fffbe9" stroke="#e5c97a" stroke-width="1.5"/><circle cx="35" cy="13" r="10" fill="#fffbe9" stroke="#e5c97a" stroke-width="1.5"/><circle cx="23" cy="31" r="10" fill="#fffbe9" stroke="#e5c97a" stroke-width="1.5"/></pattern>
+<pattern id="h-granules" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="3" cy="4" r="1.2" fill="#c98fb0"/><circle cx="10" cy="10" r="1.1" fill="#c98fb0"/></pattern>
+<!-- Filters -->
+<filter id="h-shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#2a1a10" flood-opacity="0.25"/></filter>
+<filter id="h-glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="h-blur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.5"/></filter>
+<!-- Markers -->
+<marker id="h-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 L2.5 5 Z" fill="#2b2d33"/></marker>
+<marker id="h-arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 L2.5 5 Z" fill="#c62828"/></marker>
+<marker id="h-arrow-white" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 L2.5 5 Z" fill="#ffffff"/></marker>
+<marker id="h-bar" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M5 0 L5 10" stroke="#2b2d33" stroke-width="2.6"/></marker>
+<!-- Shapes: each drawn around 0,0 -->
+<symbol id="cell" overflow="visible">
+<circle r="50" class="cell"/>
+<path d="M-34 14 q 8 12 20 9 q 9 -2 15 7 M-30 26 q 9 9 21 6" class="er"/>
+<ellipse cx="27" cy="18" rx="10" ry="4.5" transform="rotate(32 27 18)" class="mito"/>
+<ellipse cx="-30" cy="-22" rx="9" ry="4" transform="rotate(-40 -30 -22)" class="mito"/>
+<ellipse cx="22" cy="-30" rx="8" ry="4" transform="rotate(20 22 -30)" class="mito"/>
+<path d="M14 2 q 8 -6 16 0 M15 8 q 7 -5 14 0 M17 14 q 5 -3 10 0" class="golgi"/>
+<circle cx="-6" cy="-5" r="20" class="nucleus"/>
+<circle cx="-1" cy="-9" r="6" class="nucleolus"/>
+</symbol>
+<symbol id="keratinocyte" overflow="visible">
+<path d="M-30 -22 L0 -30 L30 -22 L35 8 L12 28 L-20 27 L-36 6 Z" class="cell" stroke-linejoin="round"/>
+<ellipse cx="0" cy="3" rx="13" ry="11" class="nucleus"/>
+<path d="M-12 -3 Q0 -21 12 -3 Q0 -12 -12 -3 Z" class="melanin"/>
+</symbol>
+<symbol id="melanocyte" overflow="visible"><path d="M0 0 C -20 -15 -40 -30 -62 -36" class="dendrite-edge"/><path d="M0 0 C 20 -18 38 -32 58 -44" class="dendrite-edge"/><path d="M0 0 C -25 5 -45 12 -70 8" class="dendrite-edge"/><path d="M0 0 C 25 4 48 2 72 -6" class="dendrite-edge"/><path d="M0 0 C 5 -20 8 -35 4 -55" class="dendrite-edge"/><path d="M0 0 C -20 -15 -40 -30 -62 -36" class="dendrite"/><path d="M0 0 C 20 -18 38 -32 58 -44" class="dendrite"/><path d="M0 0 C -25 5 -45 12 -70 8" class="dendrite"/><path d="M0 0 C 25 4 48 2 72 -6" class="dendrite"/><path d="M0 0 C 5 -20 8 -35 4 -55" class="dendrite"/><ellipse rx="20" ry="16" class="melanocyte-body"/><ellipse cx="-2" cy="1" rx="9" ry="8" class="nucleus"/><circle cx="-40" cy="-25" r="2.6" class="melanosome"/><circle cx="-54" cy="-32" r="2.6" class="melanosome"/><circle cx="34" cy="-28" r="2.6" class="melanosome"/><circle cx="49" cy="-38" r="2.6" class="melanosome"/><circle cx="-44" cy="10" r="2.6" class="melanosome"/><circle cx="-60" cy="9" r="2.6" class="melanosome"/><circle cx="44" cy="2" r="2.6" class="melanosome"/><circle cx="62" cy="-3" r="2.6" class="melanosome"/><circle cx="6" cy="-36" r="2.6" class="melanosome"/><circle cx="5" cy="-47" r="2.6" class="melanosome"/><circle cx="-8" cy="6" r="2.6" class="melanosome"/><circle cx="9" cy="-6" r="2.6" class="melanosome"/></symbol>
+<symbol id="melanoblast" overflow="visible">
+<path d="M40 -13 Q58 -20 63 -7 Q67 0 63 7 Q58 20 40 13 Z" class="crest-cell" opacity="0.55"/>
+<path d="M-62 2 C -50 -2 -44 -9 -30 -12 C -5 -17 25 -15 42 -10 C 52 -6 56 -3 56 0 C 56 4 50 8 42 11 C 25 16 -5 17 -30 12 C -44 9 -50 5 -62 2 Z" class="crest-cell"/>
+<ellipse cx="-6" cy="0" rx="15" ry="8" class="nucleus"/>
+</symbol>
+<symbol id="neuron" overflow="visible"><path d="M-15 -8 C -35 -20 -50 -40 -70 -48" class="neurite-edge"/><path d="M-48 -35 C -55 -30 -65 -28 -80 -31" class="neurite-edge"/><path d="M-18 6 C -40 15 -55 30 -72 44" class="neurite-edge"/><path d="M-50 27 C -60 22 -72 22 -86 25" class="neurite-edge"/><path d="M-5 -18 C -8 -38 -15 -55 -26 -72" class="neurite-edge"/><path d="M-2 18 C -5 35 -12 50 -24 68" class="neurite-edge"/><path d="M18 0 L232 0" class="neurite-edge"/><path d="M230 0 C 240 -4 248 -12 257 -19" class="neurite-edge"/><path d="M230 0 L 260 0" class="neurite-edge"/><path d="M230 0 C 240 4 248 12 257 19" class="neurite-edge"/><path d="M-15 -8 C -35 -20 -50 -40 -70 -48" class="neurite"/><path d="M-48 -35 C -55 -30 -65 -28 -80 -31" class="neurite"/><path d="M-18 6 C -40 15 -55 30 -72 44" class="neurite"/><path d="M-50 27 C -60 22 -72 22 -86 25" class="neurite"/><path d="M-5 -18 C -8 -38 -15 -55 -26 -72" class="neurite"/><path d="M-2 18 C -5 35 -12 50 -24 68" class="neurite"/><path d="M18 0 L232 0" class="neurite"/><path d="M230 0 C 240 -4 248 -12 257 -19" class="neurite"/><path d="M230 0 L 260 0" class="neurite"/><path d="M230 0 C 240 4 248 12 257 19" class="neurite"/><rect x="40" y="-7" width="32" height="14" rx="7" class="myelin"/><rect x="80" y="-7" width="32" height="14" rx="7" class="myelin"/><rect x="120" y="-7" width="32" height="14" rx="7" class="myelin"/><rect x="160" y="-7" width="32" height="14" rx="7" class="myelin"/><rect x="200" y="-7" width="32" height="14" rx="7" class="myelin"/><circle cx="259" cy="-20" r="4.5" class="neuron-body"/><circle cx="263" cy="0" r="4.5" class="neuron-body"/><circle cx="259" cy="20" r="4.5" class="neuron-body"/><path d="M-23 -6 C -21 -23 11 -25 23 -6 C 27 5 14 21 0 23 C -14 23 -27 10 -23 -6 Z" class="neuron-body"/><circle cx="-1" cy="0" r="8.5" class="nucleus"/><circle cx="1" cy="-2" r="2.5" class="nucleolus"/></symbol>
+<symbol id="fibroblast" overflow="visible">
+<path d="M-58 0 C -36 -13 30 -15 58 0 C 30 15 -36 13 -58 0 Z" class="cell"/>
+<ellipse cx="0" cy="0" rx="19" ry="6.5" class="nucleus"/>
+</symbol>
+<symbol id="rbc" overflow="visible"><circle r="12" class="rbc"/></symbol>
+<symbol id="lymphocyte" overflow="visible"><circle r="14" class="wbc"/><circle cx="1" cy="-0.5" r="11.5" class="nucleus-dark"/></symbol>
+<symbol id="neutrophil" overflow="visible"><circle r="18" class="wbc"/><circle r="18" fill="url(#h-granules)"/>
+<path d="M-8 -3 Q -4 2 0 5 M0 5 Q 4 1 8 -4" fill="none" stroke="#553592" stroke-width="2.5"/>
+<circle cx="-8" cy="-3" r="6" class="nucleus-dark"/><circle cx="0" cy="6" r="6" class="nucleus-dark"/><circle cx="8" cy="-4" r="6" class="nucleus-dark"/></symbol>
+<symbol id="monocyte" overflow="visible"><circle r="22" class="wbc"/><path d="M-13 -9 C -6 -17 11 -15 13 -4 C 14 5 7 7 4 2 C 2 -2 -2 0 -2 6 C -2 13 -13 13 -15 4 C -16 -1 -15 -5 -13 -9 Z" class="nucleus-dark"/></symbol>
+<symbol id="platelet" overflow="visible"><ellipse rx="5" ry="3" class="platelet"/><circle cx="-1.5" cy="0" r="0.9" fill="#6a3c8f"/><circle cx="1.8" cy="0.6" r="0.8" fill="#6a3c8f"/></symbol>
+<symbol id="blast" overflow="visible"><circle r="20" class="blast"/><circle cx="1" cy="0" r="16.5" class="nucleus-dark"/><circle cx="-4" cy="-4" r="3" fill="#cdbdf0"/><circle cx="6" cy="4" r="2.4" fill="#cdbdf0"/></symbol>
+<symbol id="cancer-cell" overflow="visible">
+<path d="M-50 -10 C -55 -35 -25 -58 5 -52 C 35 -55 58 -30 52 -5 C 60 20 40 52 10 50 C -20 58 -55 40 -52 15 C -60 5 -48 -2 -50 -10 Z" class="tumour-cell"/>
+<path d="M-26 -12 C -22 -33 9 -35 23 -20 C 35 -6 27 21 6 25 C -15 31 -33 12 -26 -12 Z" class="nucleus-dark"/>
+<circle cx="-6" cy="-8" r="5" class="nucleolus"/><circle cx="10" cy="8" r="4" class="nucleolus"/>
+</symbol>
+<symbol id="dividing-cell" overflow="visible">
+<path d="M0 -24 C -10 -34 -60 -40 -62 0 C -60 40 -10 34 0 24 C 10 34 60 40 62 0 C 60 -40 10 -34 0 -24 Z" class="cell"/>
+<circle cx="-30" cy="0" r="12" class="nucleus"/><circle cx="30" cy="0" r="12" class="nucleus"/>
+</symbol>
+<symbol id="apoptotic-cell" overflow="visible">
+<circle r="27" class="dying"/>
+<circle cx="-24" cy="-14" r="9" class="dying"/><circle cx="20" cy="-20" r="8" class="dying"/><circle cx="27" cy="12" r="10" class="dying"/><circle cx="-10" cy="26" r="8" class="dying"/><circle cx="-28" cy="10" r="7" class="dying"/>
+<circle cx="-6" cy="-5" r="5" class="nucleus-dark"/><circle cx="5" cy="-1" r="4" class="nucleus-dark"/><circle cx="-2" cy="7" r="4.5" class="nucleus-dark"/><circle cx="8" cy="9" r="3" class="nucleus-dark"/>
+</symbol>
+<symbol id="mitochondrion" overflow="visible">
+<ellipse rx="31" ry="14" class="mito"/>
+<ellipse rx="26" ry="9.5" fill="#ffd9c2" stroke="#d0583a" stroke-width="1.5"/>
+<path d="M-18 -9 L-18 4 M-9 9 L-9 -4 M0 -9 L0 4 M9 9 L9 -4 M18 -9 L18 4" fill="none" stroke="#d0583a" stroke-width="3" stroke-linecap="round"/>
+</symbol>
+<symbol id="nucleus" overflow="visible"><circle r="30" class="nucleus"/><circle r="27" fill="none" stroke="#6b4fae" stroke-width="1" opacity="0.7"/><circle cx="-12" cy="-8" r="4" fill="#6b4fae" opacity="0.55"/><circle cx="10" cy="-12" r="3.5" fill="#6b4fae" opacity="0.55"/><circle cx="14" cy="8" r="4" fill="#6b4fae" opacity="0.55"/><circle cx="-6" cy="12" r="3.5" fill="#6b4fae" opacity="0.55"/><circle cx="-16" cy="6" r="3" fill="#6b4fae" opacity="0.55"/><circle cx="4" cy="-2" r="3" fill="#6b4fae" opacity="0.55"/><circle cx="2" cy="-4" r="7" class="nucleolus"/></symbol>
+<symbol id="dna" overflow="visible"><path d="M-117.5 -3.5 L-117.5 3.5 M-107.5 -13.0 L-107.5 13.0 M-97.5 -9.5 L-97.5 9.5 M-87.5 -3.5 L-87.5 3.5 M-77.5 -13.0 L-77.5 13.0 M-67.5 -9.5 L-67.5 9.5 M-57.5 -3.5 L-57.5 3.5 M-47.5 -13.0 L-47.5 13.0 M-37.5 -9.5 L-37.5 9.5 M-27.5 -3.5 L-27.5 3.5 M-17.5 -13.0 L-17.5 13.0 M-7.5 -9.5 L-7.5 9.5 M2.5 -3.5 L2.5 3.5 M12.5 -13.0 L12.5 13.0 M22.5 -9.5 L22.5 9.5 M32.5 -3.5 L32.5 3.5 M42.5 -13.0 L42.5 13.0 M52.5 -9.5 L52.5 9.5 M62.5 -3.5 L62.5 3.5 M72.5 -13.0 L72.5 13.0 M82.5 -9.5 L82.5 9.5 M92.5 -3.5 L92.5 3.5 M102.5 -13.0 L102.5 13.0 M112.5 -9.5 L112.5 9.5 " class="dna-rung"/><path d="M-120 0 C -110 -18 -100 -18 -90 0 S -70 18 -60 0 S -40 -18 -30 0 S -10 18 0 0 S 20 -18 30 0 S 50 18 60 0 S 80 -18 90 0 S 110 18 120 0" class="dna-strand"/><path d="M-120 0 C -110 18 -100 18 -90 0 S -70 -18 -60 0 S -40 18 -30 0 S -10 -18 0 0 S 20 18 30 0 S 50 -18 60 0 S 80 18 90 0 S 110 -18 120 0" class="dna-strand-2"/></symbol>
+<symbol id="receptor" overflow="visible">
+<rect x="-34" y="-6" width="68" height="12" class="membrane-band"/>
+<rect x="-14" y="-8" width="8" height="16" rx="3" class="receptor"/><rect x="6" y="-8" width="8" height="16" rx="3" class="receptor"/>
+<path d="M-10 -8 C -26 -14 -30 -34 -22 -46 C -14 -58 -2 -52 -4 -40 C -6 -28 -2 -18 -10 -8 Z" class="receptor"/>
+<path d="M10 -8 C 26 -14 30 -34 22 -46 C 14 -58 2 -52 4 -40 C 6 -28 2 -18 10 -8 Z" class="receptor"/>
+<ellipse cx="-11" cy="22" rx="10" ry="14" class="receptor"/><ellipse cx="11" cy="22" rx="10" ry="14" class="receptor"/>
+</symbol>
+<symbol id="vessel" overflow="visible">
+<circle r="40" class="vessel-wall"/>
+<circle r="31" fill="#fdf0ee" stroke="#d98080" stroke-width="1"/>
+<ellipse cx="0" cy="-35" rx="12" ry="4.5" class="nucleus"/>
+<use href="#rbc" x="-9" y="6"/><use href="#rbc" x="13" y="-8"/>
+</symbol>
+<symbol id="epithelial-cell" overflow="visible">
+<path d="M-15 -26 L-15 -30 M-9 -26 L-9 -31 M-3 -26 L-3 -31 M3 -26 L3 -31 M9 -26 L9 -31 M15 -26 L15 -30" stroke="#c98b74" stroke-width="2" stroke-linecap="round"/>
+<rect x="-17" y="-27" width="34" height="58" rx="5" class="cell"/>
+<ellipse cx="0" cy="12" rx="9" ry="12" class="nucleus"/>
+</symbol>
+<symbol id="virus" overflow="visible"><path d="M18.0 0.0 L27.0 0.0" stroke="#3d7f30" stroke-width="2.5"/><circle cx="27.0" cy="0.0" r="3.5" fill="#e0574a"/><path d="M15.6 9.0 L23.4 13.5" stroke="#3d7f30" stroke-width="2.5"/><circle cx="23.4" cy="13.5" r="3.5" fill="#e0574a"/><path d="M9.0 15.6 L13.5 23.4" stroke="#3d7f30" stroke-width="2.5"/><circle cx="13.5" cy="23.4" r="3.5" fill="#e0574a"/><path d="M0.0 18.0 L0.0 27.0" stroke="#3d7f30" stroke-width="2.5"/><circle cx="0.0" cy="27.0" r="3.5" fill="#e0574a"/><path d="M-9.0 15.6 L-13.5 23.4" stroke="#3d7f30" stroke-width="2.5"/><circle cx="-13.5" cy="23.4" r="3.5" fill="#e0574a"/><path d="M-15.6 9.0 L-23.4 13.5" stroke="#3d7f30" stroke-width="2.5"/><circle cx="-23.4" cy="13.5" r="3.5" fill="#e0574a"/><path d="M-18.0 0.0 L-27.0 0.0" stroke="#3d7f30" stroke-width="2.5"/><circle cx="-27.0" cy="0.0" r="3.5" fill="#e0574a"/><path d="M-15.6 -9.0 L-23.4 -13.5" stroke="#3d7f30" stroke-width="2.5"/><circle cx="-23.4" cy="-13.5" r="3.5" fill="#e0574a"/><path d="M-9.0 -15.6 L-13.5 -23.4" stroke="#3d7f30" stroke-width="2.5"/><circle cx="-13.5" cy="-23.4" r="3.5" fill="#e0574a"/><path d="M-0.0 -18.0 L-0.0 -27.0" stroke="#3d7f30" stroke-width="2.5"/><circle cx="-0.0" cy="-27.0" r="3.5" fill="#e0574a"/><path d="M9.0 -15.6 L13.5 -23.4" stroke="#3d7f30" stroke-width="2.5"/><circle cx="13.5" cy="-23.4" r="3.5" fill="#e0574a"/><path d="M15.6 -9.0 L23.4 -13.5" stroke="#3d7f30" stroke-width="2.5"/><circle cx="23.4" cy="-13.5" r="3.5" fill="#e0574a"/><circle r="19" class="virus"/><circle r="9" fill="none" stroke="#3d7f30" stroke-width="1.5" stroke-dasharray="3 3"/></symbol>
+<symbol id="bacterium" overflow="visible">
+<path d="M32 0 C 44 -8 52 8 64 0 S 82 -8 92 0" fill="none" stroke="#7c8f36" stroke-width="2"/>
+<rect x="-34" y="-13" width="68" height="26" rx="13" class="bacterium"/>
+<path d="M-20 -3 C -10 4 0 -5 10 2 S 22 -3 24 2" fill="none" stroke="#6e8231" stroke-width="2" opacity="0.6"/>
+</symbol>
+<symbol id="antibody" overflow="visible"><path d="M0 24 L0 0" class="antibody-edge"/><path d="M0 0 L-17 -22" class="antibody-edge"/><path d="M0 0 L17 -22" class="antibody-edge"/><path d="M0 24 L0 0" class="antibody"/><path d="M0 0 L-17 -22" class="antibody"/><path d="M0 0 L17 -22" class="antibody"/></symbol>
+<symbol id="macrophage" overflow="visible">
+<path d="M-48 -6 C -60 -20 -42 -34 -30 -30 C -24 -48 4 -54 14 -40 C 30 -50 54 -36 46 -18 C 66 -8 60 18 44 20 C 46 40 20 52 6 40 C -8 56 -36 46 -34 30 C -56 30 -62 8 -48 -6 Z" class="macrophage"/>
+<path d="M-14 -10 C -6 -20 14 -18 16 -6 C 17 4 9 6 6 1 C 3 -3 -2 -1 -2 6 C -2 14 -14 14 -16 4 C -17 -2 -16 -6 -14 -10 Z" class="nucleus"/>
+<circle cx="24" cy="18" r="8" fill="#f1dcc8" stroke="#b3906c" stroke-width="1.5"/><circle cx="-28" cy="12" r="6" fill="#f1dcc8" stroke="#b3906c" stroke-width="1.5"/>
+</symbol>
+<symbol id="adipocyte" overflow="visible">
+<circle r="40" class="cell"/>
+<circle cx="-3" cy="0" r="35" class="lipid"/>
+<path d="M30 -10 C 38 -4 38 8 30 14 C 34 4 34 -2 30 -10 Z" class="nucleus"/>
+</symbol>

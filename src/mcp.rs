@@ -140,18 +140,17 @@ fn send(message: &Value) {
 
 /// What the agent is told when it connects.
 const INSTRUCTIONS: &str = "\
-cellstage is a window beside this conversation, where you show the user biology while you explain it: proteins at their measured atomic structure, a cell under a fluorescence microscope driven live by cellweave's protein network, and stained tissue sections. The user sees it, can turn and zoom what is in it, and can click on things to ask about them.
+cellstage is a window beside this conversation where you tell the user biology as a story in pictures, step by step, and the user moves through the steps with the arrow keys, turning, zooming and clicking what is shown. Anything in the body can be shown: proteins at their measured structure, a cell whose network cellweave runs live, stained sections of skin, and for everything else drawings you write yourself in SVG (an embryo, an organ, the brain, blood, a pathway, a timeline), which can move from one frame to the next.
 
-How to use it:
-- Split the window into panels with stage_layout, or let a show_* call create a panel by naming it. Up to four panels.
-- Every panel is labelled by what it is: a measured structure (Protein Data Bank), a simulation (computed by cellweave's model) or an illustration (drawn from what histology describes). Never present an illustration as a measurement or a simulation result; say which it is when you talk about it.
-- show_protein fetches any PDB entry; its answer lists the chains, their residue numbers and what is bound, so you can highlight the right residues. Check the numbering before you highlight.
-- show_cell runs the fuller cell network of cellweave (18 proteins) in one cell: set oxygen, EGF and stress, remove genes or stick them on, choose three proteins to stain. Its answer gives every level and the cell's fate.
-- show_skin draws an H&E section of skin, normal or with a melanocytic lesion at a named stage. The same seed keeps the same skin across stages, so a progression can be shown one stage after another.
-- annotate writes on a panel, with an optional arrow; on a protein, a note can follow a residue as the protein turns.
-- get_user_events returns what the user clicked since the last call, with what was under the pointer. Call it when the user refers to something they clicked.
-- screenshot returns a picture of the window, to check what you drew.
-The teaching, the explanations and any revision are yours to lead; the stage only draws.";
+How to work:
+1. First call library_search with the subject. Every story ever told here is kept on disk; if one fits, story_open shows it at once, and you tell it from there, adding or changing steps as needed. Kept drawings can be reused by name.
+2. Otherwise story_new, then build the story one step at a time. Each step has a title and a narration of one to three short sentences shown under the pictures; then lay the step out (stage_layout, one to six panels; one large panel is often best) and fill its panels with show_protein, show_cell, show_skin or draw. story_step adds the next step; keep_panels carries the panels over so you change only what moves on.
+3. Everything you show is kept in the step on screen as you go. Every answer ends with where you are, [story, step k of n]. If the user moved to another step, your calls change that step.
+4. draw: call drawing_kit once per conversation for the house classes and ready-made shapes, which give every drawing the same look. Give ids to the parts you will point at. To show something changing (the neural tube closing, cells migrating, a tumour growing), give changes: each further frame as what changes from the one before, {id: {attribute: value}}; the window moves smoothly between them. It is much quicker to write than whole frames. Name a drawing worth reusing, so it is kept in the library.
+5. annotate with on=<part> to point at a named part of a drawing, a section or a cell (the show and draw answers list them), or chain and residue on a protein: the window places the note itself. Avoid coordinates and avoid checking with screenshot after every call; one screenshot when a new layout is done is enough.
+6. Every panel is labelled by what it is: a measured structure (Protein Data Bank), a simulation (cellweave's model) or an illustration (a section drawn from histology, or your schematic). Never present an illustration as a measurement or a simulation result.
+7. get_user_events tells you what the user clicked and which step they moved to. Call it when they refer to something in the window.
+The story carries the pictures and the short words; the teaching, the longer explanations and any revision are yours, in the conversation.";
 
 /// The tools, with what each does and what it takes.
 fn tools() -> Value {
@@ -159,12 +158,80 @@ fn tools() -> Value {
     let genes: Vec<&str> = GENES.to_vec();
     json!([
         {
-            "name": "stage_layout",
-            "description": "Split the window into panels, replacing those there were. Each panel has an id the show_* tools name, and a title shown above it. One to four panels, side by side, stacked, or in a grid.",
+            "name": "library_search",
+            "description": "Search the stories and drawings kept from every past conversation, by subject (words in any language). Call it before building anything. With no query, lists the latest stories.",
+            "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}}
+        },
+        {
+            "name": "story_open",
+            "description": "Open a kept story and show one of its steps (the first by default). The answer gives its outline.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"id": {"type": "string"}, "step": {"type": "integer", "minimum": 1}},
+                "required": ["id"]
+            }
+        },
+        {
+            "name": "story_new",
+            "description": "Begin a new story, kept in the library as it is told. It starts at its first step, empty: lay it out and fill it, then story_step for the next.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "panels": {"type": "array", "minItems": 1, "maxItems": 4, "items": {
+                    "title": {"type": "string"},
+                    "summary": {"type": "string", "description": "One sentence: what it explains, for finding it again."},
+                    "tags": {"type": "array", "items": {"type": "string"}, "description": "Subjects, such as organs, cells, diseases, proteins."},
+                    "step_title": {"type": "string"},
+                    "narration": {"type": "string", "description": "What the first step says, one to three short sentences."}
+                },
+                "required": ["title"]
+            }
+        },
+        {
+            "name": "story_step",
+            "description": "Add a step after the one on screen and show it. It starts empty, or with the panels of the step before when keep_panels is true (their notes too with keep_notes).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "narration": {"type": "string", "description": "One to three short sentences, shown under the pictures."},
+                    "keep_panels": {"type": "boolean", "default": false},
+                    "keep_notes": {"type": "boolean", "default": false}
+                },
+                "required": ["title"]
+            }
+        },
+        {
+            "name": "story_edit",
+            "description": "Change the words of a step (the one on screen unless step is given), or the story's title, summary and tags.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "step": {"type": "integer", "minimum": 1},
+                    "title": {"type": "string"},
+                    "narration": {"type": "string"},
+                    "story_title": {"type": "string"},
+                    "summary": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}}
+                }
+            }
+        },
+        {
+            "name": "story_goto",
+            "description": "Show a step of the story, counted from 1.",
+            "inputSchema": {"type": "object", "properties": {"step": {"type": "integer", "minimum": 1}}, "required": ["step"]}
+        },
+        {
+            "name": "story_remove_step",
+            "description": "Remove a step (the one on screen unless step is given).",
+            "inputSchema": {"type": "object", "properties": {"step": {"type": "integer", "minimum": 1}}}
+        },
+        {
+            "name": "stage_layout",
+            "description": "Lay the step on screen out in panels, replacing those there were. Each panel has an id the show tools name, and a title. One to six panels, side by side, stacked, or in a grid.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "panels": {"type": "array", "minItems": 1, "maxItems": 6, "items": {
                         "type": "object",
                         "properties": {"id": {"type": "string"}, "title": {"type": "string"}},
                         "required": ["id"]
@@ -173,6 +240,34 @@ fn tools() -> Value {
                 },
                 "required": ["panels"]
             }
+        },
+        {
+            "name": "draw",
+            "description": "Draw in a panel with SVG you write: anything the other tools do not show, at any scale, from the body to a molecule. The window adds the house style (call drawing_kit for its classes and shapes) and a light page. Give frames to show a change: the window moves smoothly from each frame to the next. Give ids to parts you will point at. With only a name, shows a drawing kept in the library.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "panel": {"type": "string"},
+                    "title": {"type": "string"},
+                    "caption": {"type": "string"},
+                    "svg": {"type": "string", "description": "SVG elements, in a 1600 by 1000 space unless view_box says otherwise; or a whole <svg> document."},
+                    "frames": {"type": "array", "items": {"type": "string"}, "description": "Further frames after svg (or all of them without svg): the same drawing with numbers changed."},
+                    "changes": {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": {"type": ["string", "number"]}}}, "description": "Further frames, each given by what changes from the frame before: {element id: {attribute: new value}}, such as {\"crest_1\": {\"transform\": \"translate(420 380) scale(0.6)\"}, \"label\": {\"opacity\": 1}}. Far shorter than whole frames; change attributes the first frame already has."},
+                    "view_box": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2, "description": "Width and height of the drawing space."},
+                    "seconds": {"type": "number", "default": 2, "description": "How long each move from one frame to the next takes."},
+                    "hold": {"type": "number", "default": 0.8, "description": "How long each frame is held before moving on."},
+                    "loop": {"type": "boolean", "default": false},
+                    "background": {"type": "string", "description": "light (default), dark, or #rrggbb."},
+                    "parts": {"type": "object", "additionalProperties": {"type": "string"}, "description": "What some ids are, told to you when the user clicks them."},
+                    "name": {"type": "string", "description": "Keep the drawing in the library under this name; alone, show the kept drawing."}
+                },
+                "required": ["panel"]
+            }
+        },
+        {
+            "name": "drawing_kit",
+            "description": "The house style for draw: its classes (cells, organelles, germ layers, tissues, organs, molecules, arrows, effects) and ready-made shapes (cells of every kind, blood cells, neuron, DNA, receptor, vessel, virus...). Call once per conversation. With picture, also a picture of them all.",
+            "inputSchema": {"type": "object", "properties": {"picture": {"type": "boolean", "default": false}}}
         },
         {
             "name": "show_protein",
@@ -228,7 +323,7 @@ fn tools() -> Value {
         },
         {
             "name": "show_skin",
-            "description": "Draw a section of skin stained with haematoxylin and eosin, as a pathologist sees it, normal or with a melanocytic lesion at a named stage. An illustration drawn from the histological criteria of each stage, not a simulation. The same seed keeps the same skin across stages. The answer gives the Breslow thickness of an invasive melanoma.",
+            "description": "Draw a section of skin stained with haematoxylin and eosin, as a pathologist sees it, normal or with a melanocytic lesion at a named stage. An illustration drawn from the histological criteria of each stage, not a simulation. The same seed keeps the same skin across stages. The answer gives the Breslow thickness of an invasive melanoma and the places notes can point at.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -243,15 +338,16 @@ fn tools() -> Value {
         },
         {
             "name": "annotate",
-            "description": "Write a note on a panel, at a point given as fractions of its width and height from its top left, with an optional arrow to another point. On a protein panel, give a chain and a residue instead to pin the note to that residue as the protein turns.",
+            "description": "Write a note on a panel. Point it with on=<part> (a part of a drawing, a place in a section or a cell, as their answers list) or chain and residue on a protein: the window places the words beside it and follows it as it moves or turns. x and y (fractions of the panel from its top left) place the words yourself; arrow_to points them at a spot.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "panel": {"type": "string"},
                     "text": {"type": "string"},
+                    "on": {"type": "string"},
+                    "chain": {"type": "string"}, "residue": {"type": "integer"},
                     "x": {"type": "number"}, "y": {"type": "number"},
-                    "arrow_to": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
-                    "chain": {"type": "string"}, "residue": {"type": "integer"}
+                    "arrow_to": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
                 },
                 "required": ["panel", "text"]
             }
@@ -272,7 +368,7 @@ fn tools() -> Value {
         },
         {
             "name": "get_user_events",
-            "description": "What the user clicked in the window since the last call: the panel, where, and what was there (an amino acid, a compartment of the cell, a region of a section).",
+            "description": "What the user did in the window since the last call: what they clicked (an amino acid, a part of a drawing, a place in a section or a cell) and the steps they moved to.",
             "inputSchema": {"type": "object", "properties": {}}
         },
         {
