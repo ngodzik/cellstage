@@ -8,15 +8,18 @@
 //! Each world is its own module, built on the engine's groups of glowing
 //! parts; this one shows them in panels and runs their films.
 
+pub mod death;
 pub mod engine;
 pub mod film;
 pub mod glow;
 pub mod nevus;
 pub mod nucleus;
 pub mod shapes;
+pub mod signals;
 pub mod skin;
 pub mod skin_world;
 pub mod surface;
+pub mod telomeres;
 pub mod tumour;
 
 use std::collections::HashMap;
@@ -26,11 +29,14 @@ use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
 
 use crate::stage::Stage;
+use death::DeathWorld;
 use engine::{Things, Tick};
 use film::{Eye, Film, Place};
 use glow::Glow;
+use signals::SignalWorld;
 use skin_world::SkinWorld;
 use surface::Surface;
+use telomeres::TelomereWorld;
 
 /// What a world can be asked for: its name, its stories, its places, what
 /// can be set apart in it, and what its clock counts.
@@ -46,15 +52,44 @@ pub struct About {
 }
 
 /// Every world there is.
-pub const WORLDS: [About; 1] = [About {
-    name: "skin",
-    variants: &skin_world::VARIANTS,
-    places: &skin_world::PLACES,
-    highlights: skin_world::highlights,
-    things: SkinWorld::things,
-    start: -1.0,
-    clock: SkinWorld::clock_label,
-}];
+pub const WORLDS: [About; 4] = [
+    About {
+        name: "skin",
+        variants: &skin_world::VARIANTS,
+        places: &skin_world::PLACES,
+        highlights: skin_world::highlights,
+        things: SkinWorld::things,
+        start: -1.0,
+        clock: SkinWorld::clock_label,
+    },
+    About {
+        name: "growth_signals",
+        variants: &signals::VARIANTS,
+        places: &signals::PLACES,
+        highlights: signals::highlights,
+        things: signals::things,
+        start: -1.0,
+        clock: signals::clock_label,
+    },
+    About {
+        name: "cell_death",
+        variants: &death::VARIANTS,
+        places: &death::PLACES,
+        highlights: death::highlights,
+        things: death::things,
+        start: -0.5,
+        clock: death::clock_label,
+    },
+    About {
+        name: "telomeres",
+        variants: &telomeres::VARIANTS,
+        places: &telomeres::PLACES,
+        highlights: telomeres::highlights,
+        things: telomeres::things,
+        start: 0.0,
+        clock: telomeres::clock_label,
+    },
+];
 
 /// The world of that name.
 pub fn about(name: &str) -> Option<&'static About> {
@@ -108,24 +143,36 @@ pub fn all_variants() -> Vec<&'static str> {
 /// What a panel's world is.
 enum Content {
     Skin(SkinWorld),
+    Signals(SignalWorld),
+    Death(DeathWorld),
+    Telomeres(TelomereWorld),
 }
 
 impl Content {
     fn places(&self) -> &[Place] {
         match self {
             Content::Skin(w) => w.places(),
+            Content::Signals(w) => w.places(),
+            Content::Death(w) => w.places(),
+            Content::Telomeres(w) => w.places(),
         }
     }
 
     fn locate(&self, name: &str, clock: f32, focus: Vec3) -> Option<Vec3> {
         match self {
             Content::Skin(w) => w.locate(name, clock, focus),
+            Content::Signals(w) => w.locate(name, clock, focus),
+            Content::Death(w) => w.locate(name, clock, focus),
+            Content::Telomeres(w) => w.locate(name, clock, focus),
         }
     }
 
     fn pick(&self, origin: Vec3, direction: Vec3, clock: f32, d: f32) -> Option<String> {
         match self {
             Content::Skin(w) => w.pick(origin, direction, clock, d),
+            Content::Signals(w) => w.pick(origin, direction, clock, d),
+            Content::Death(w) => w.pick(origin, direction, clock, d),
+            Content::Telomeres(w) => w.pick(origin, direction, clock, d),
         }
     }
 
@@ -138,12 +185,18 @@ impl Content {
     ) {
         match self {
             Content::Skin(w) => w.update(tick, things, glows, surfaces),
+            Content::Signals(w) => w.update(tick, things, glows),
+            Content::Death(w) => w.update(tick, things, glows),
+            Content::Telomeres(w) => w.update(tick, things, glows),
         }
     }
 
     fn entities(self) -> Vec<Entity> {
         match self {
             Content::Skin(w) => w.entities(),
+            Content::Signals(w) => w.entities(),
+            Content::Death(w) => w.entities(),
+            Content::Telomeres(w) => w.entities(),
         }
     }
 }
@@ -244,6 +297,7 @@ pub struct Worlds {
     pub map: HashMap<String, WorldScene>,
     next: usize,
     skin_meshes: Option<skin_world::Meshes>,
+    solids: Option<engine::Solids>,
 }
 
 /// Build what takes time before it is asked for.
@@ -280,6 +334,33 @@ pub fn show(world: &mut World, panel: &str, name: &str, variant: &str) -> Result
                 .clone();
             SkinWorld::spawn(world, layer.clone(), variant, &meshes).map(Content::Skin)
         }
+        "growth_signals" => {
+            let solids = worlds
+                .solids
+                .get_or_insert_with(|| {
+                    engine::Solids::make(&mut world.resource_mut::<Assets<Mesh>>())
+                })
+                .clone();
+            SignalWorld::spawn(world, layer.clone(), variant, &solids).map(Content::Signals)
+        }
+        "cell_death" => {
+            let solids = worlds
+                .solids
+                .get_or_insert_with(|| {
+                    engine::Solids::make(&mut world.resource_mut::<Assets<Mesh>>())
+                })
+                .clone();
+            DeathWorld::spawn(world, layer.clone(), variant, &solids).map(Content::Death)
+        }
+        "telomeres" => {
+            let solids = worlds
+                .solids
+                .get_or_insert_with(|| {
+                    engine::Solids::make(&mut world.resource_mut::<Assets<Mesh>>())
+                })
+                .clone();
+            TelomereWorld::spawn(world, layer.clone(), variant, &solids).map(Content::Telomeres)
+        }
         _ => Err(format!("no world {name}")),
     };
     let content = match made {
@@ -292,7 +373,7 @@ pub fn show(world: &mut World, panel: &str, name: &str, variant: &str) -> Result
     let eye = content
         .places()
         .iter()
-        .find(|p| p.name == "skin")
+        .find(|p| matches!(p.name, "skin" | "cell" | "spread"))
         .or(content.places().first())
         .map(|p| p.eye)
         .unwrap_or(Eye {

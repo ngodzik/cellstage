@@ -357,6 +357,8 @@ pub fn camera(world: &mut World, order: isize, layer: RenderLayers, eye: &Eye) -
 #[derive(Clone)]
 pub struct Solids {
     pub ball: Handle<Mesh>,
+    /// A sphere fine enough to fill the view: a whole cell, a nucleus.
+    pub globe: Handle<Mesh>,
     pub bead: Handle<Mesh>,
     pub rod: Handle<Mesh>,
     pub ring: Handle<Mesh>,
@@ -368,6 +370,12 @@ impl Solids {
     pub fn make(meshes: &mut Assets<Mesh>) -> Self {
         Self {
             ball: meshes.add(super::shapes::ball()),
+            globe: meshes.add(
+                Sphere::new(1.0)
+                    .mesh()
+                    .ico(5)
+                    .unwrap_or_else(|_| Sphere::new(1.0).mesh().uv(96, 48)),
+            ),
             bead: meshes.add(super::shapes::bead()),
             rod: meshes.add(Cylinder::new(1.0, 2.0).mesh().resolution(12).build()),
             ring: meshes.add(
