@@ -19,7 +19,7 @@ cellstage is a [Model Context Protocol](https://modelcontextprotocol.io) server 
 - **charts** of numbers the agent gives, as lines, areas, bars or points, each with where its numbers come from;
 - **pages of words**: headings, lists, a definition set apart, for a summary or the words to remember;
 - **proteins** at the atomic structure their authors measured, any entry of the Protein Data Bank, or as the AlphaFold database predicts any human protein, as atoms or as their fold, with residues highlighted, notes pinned to residues as the protein turns, and a slider between two states of the same protein;
-- **one cell under a fluorescence microscope**, its protein network run live by [cellweave](../cellweave): oxygen, growth factor and stress set by the agent, genes removed or stuck on, each stained protein glowing where it lives, the cell cycling, arresting, taking itself apart or bursting by cellweave's thresholds;
+- **one cell under a fluorescence microscope**, its protein network run live by [cellweave](https://github.com/ngodzik/cellweave): oxygen, growth factor and stress set by the agent, genes removed or stuck on, each stained protein glowing where it lives, the cell cycling, arresting, taking itself apart or bursting by cellweave's thresholds;
 - **stained sections of skin**, normal or with a melanocytic lesion at one of ten stages, from a junctional nevus to a nodular melanoma, drawn in haematoxylin and eosin from the criteria histology uses to tell them apart.
 
 The agent points at things by name, a part of its drawing or of a template, a node of a diagram, a place in a section or a cell, a residue, and the window places the note beside it and follows it as it moves. It can look things up as it tells: proteins in UniProt and the PDB, pathways in Reactome. The window makes everything it shows: it shows no pictures from anywhere else, and a drawing takes none. When a subject is in none of its worlds, and is not a protein, the live cell or a section of skin, the agent is told to say that cellstage cannot show it yet, rather than draw it instead. The user turns and zooms what is shown and clicks on things; the agent hears what was clicked, and which step the user went to. The teaching is the agent's: cellstage only shows.
@@ -43,13 +43,10 @@ Every panel carries a label, so that a drawing is never taken for a measurement 
 
 It builds against cellweave's crates, so cellweave must sit next to it, at a revision that has the fuller cell of its chapter 28:
 
-```
-g/
-├── cellweave/
-└── cellstage/
-```
-
 ```sh
+git clone https://github.com/ngodzik/cellweave.git
+git clone https://github.com/ngodzik/cellstage.git
+cd cellstage
 cargo build --release
 claude mcp add -s user cellstage -- "$(pwd)/target/release/cellstage"
 ```
@@ -93,3 +90,7 @@ No structure, picture or record from elsewhere is stored in the project. What th
 The house shapes, colours and templates are drawn for this project. Drawings are rendered with [resvg](https://github.com/linebender/resvg) (Apache-2.0 or MIT).
 
 The H&E colours follow the Beer-Lambert law with the haematoxylin and eosin stain vectors of Ruifrok and Johnston (Anal Quant Cytol Histol 23, 291-299, 2001).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
