@@ -49,23 +49,20 @@ pub enum Kind {
     Cell,
     /// A tissue drawn from what histology describes.
     Skin,
-    /// A drawing the agent wrote.
-    Drawing,
     /// A world in three dimensions, built ahead of time, that the agent
     /// films.
     World,
 }
 
 impl Kind {
-    /// The label every panel carries, so that a drawing is never taken for
-    /// a measurement or a result.
+    /// The label every panel carries, so that an illustration is never
+    /// taken for a measurement or a result.
     pub fn label(self) -> &'static str {
         match self {
             Kind::Empty => "",
             Kind::Protein => "MEASURED STRUCTURE",
             Kind::Cell => "SIMULATION · cellweave's network; the cell's look is drawn",
             Kind::Skin => "ILLUSTRATION · drawn from histology, not simulated",
-            Kind::Drawing => "ILLUSTRATION · a schematic drawn by the agent",
             Kind::World => "ILLUSTRATION · a 3D world built from histology, not a simulation",
         }
     }
@@ -75,7 +72,6 @@ impl Kind {
             Kind::Protein => egui::Color32::from_rgb(120, 190, 255),
             Kind::Cell => egui::Color32::from_rgb(120, 225, 160),
             Kind::Skin => egui::Color32::from_rgb(245, 180, 110),
-            Kind::Drawing => egui::Color32::from_rgb(240, 200, 120),
             Kind::World => egui::Color32::from_rgb(190, 160, 255),
             Kind::Empty => egui::Color32::GRAY,
         }
@@ -89,7 +85,7 @@ pub enum Anchor {
     Fraction(f32, f32),
     /// A residue of a protein, followed as the protein turns.
     Residue(char, i32),
-    /// A named part: of a drawing, a section, a cell.
+    /// A named place: of a world, a section, a cell.
     Part(String),
 }
 
@@ -112,8 +108,7 @@ pub struct Panel {
     /// A line under the label: which entry, which stage, which setting.
     pub source: String,
     pub kind: Kind,
-    /// A label said more exactly than the kind's: a chart, a page, a
-    /// picture, a predicted structure.
+    /// A label said more exactly than the kind's: a predicted structure.
     pub label: Option<String>,
     pub notes: Vec<Note>,
     /// The call whose result it shows, to know whether a step needs it
@@ -192,8 +187,6 @@ pub struct Stage {
     pub events: Vec<String>,
     /// Whether the window has been shown yet.
     pub shown: bool,
-    /// Physical pixels to a logical point, as egui last said.
-    pub pixels_per_point: f32,
 }
 
 impl Default for Stage {
@@ -209,7 +202,6 @@ impl Default for Stage {
             library: false,
             events: Vec::new(),
             shown: false,
-            pixels_per_point: 1.0,
         }
     }
 }

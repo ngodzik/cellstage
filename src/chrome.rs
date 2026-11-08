@@ -10,7 +10,6 @@ use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiTextureHandle, egui};
 
 use crate::cell::specimen::{self, Compartment};
-use crate::drawing;
 use crate::scene::{self, Scenes};
 use crate::stage::{self, Anchor, Kind, Stage};
 use crate::tissue::skin;
@@ -33,13 +32,12 @@ pub fn chrome(
     mut contexts: EguiContexts,
     mut stage: ResMut<Stage>,
     mut scenes: ResMut<Scenes>,
-    mut views: ResMut<Views>,
+    views: Res<Views>,
     mut worlds: ResMut<Worlds>,
     cameras: Query<(&Camera, &GlobalTransform)>,
     mut shelf: Local<Shelf>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?.clone();
-    stage.pixels_per_point = ctx.pixels_per_point();
     let steps = stage.story.as_ref().map_or(0, |s| s.steps.len());
 
     // The arrow keys move through the steps.
@@ -125,7 +123,6 @@ pub fn chrome(
                 let size = match panel.kind {
                     Kind::Cell => (specimen::SIZE as f32, specimen::SIZE as f32),
                     Kind::Skin => (skin::WIDTH as f32, skin::HEIGHT as f32),
-                    Kind::Drawing => views.drawings.get(&panel.id).map_or((1.0, 1.0), |d| d.size),
                     _ => (1.0, 1.0),
                 };
                 let response = ui.interact(
@@ -143,10 +140,6 @@ pub fn chrome(
                 let whole = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
                 if let Some(texture) = panel.texture {
                     match panel.kind {
-                        // A drawing is rendered to the panel's size, at its zoom.
-                        Kind::Drawing => {
-                            clipped.image(texture, content, whole, egui::Color32::WHITE);
-                        }
                         Kind::Cell | Kind::Skin => {
                             clipped.image(texture, image_rect, whole, egui::Color32::WHITE);
                             scale_bar(&clipped, panel.kind, image_rect, content, size.0);
@@ -179,14 +172,9 @@ pub fn chrome(
                             }
                         }
                     }
-                    Kind::Cell | Kind::Skin | Kind::Drawing => {
-                        let most = if panel.kind == Kind::Drawing {
-                            12.0
-                        } else {
-                            8.0
-                        };
+                    Kind::Cell | Kind::Skin => {
                         if scroll != 0.0 {
-                            panel.zoom = (panel.zoom * (1.0 + scroll * 0.002)).clamp(1.0, most);
+                            panel.zoom = (panel.zoom * (1.0 + scroll * 0.002)).clamp(1.0, 8.0);
                         }
                         if response.dragged() {
                             let d = response.drag_delta();
@@ -229,16 +217,6 @@ pub fn chrome(
                         Kind::Skin => views.skins.get(&panel.id).map(|v| {
                             let r = v.section.region(p.x, p.y);
                             format!("{}: {}", r.name(), r.what())
-                        }),
-                        Kind::Drawing => views.drawings.get(&panel.id).and_then(|d| {
-                            let part = drawing::part_at(&d.parts, p.x, p.y)?;
-                            let said = d
-                                .described
-                                .iter()
-                                .find(|(id, _)| *id == part.id)
-                                .map(|(_, what)| format!(", {what}"))
-                                .unwrap_or_default();
-                            Some(format!("the part {}{said}", part.id))
                         }),
                         Kind::World => worlds.map.get(&panel.id).and_then(|scene| {
                             let (camera, eye) = cameras.get(scene.camera).ok()?;
@@ -288,9 +266,6 @@ pub fn chrome(
                         }
                         Anchor::Part(name) => {
                             let at = match panel.kind {
-                                Kind::Drawing => views.drawings.get(&panel.id).and_then(|d| {
-                                    d.parts.iter().find(|p| p.id == *name).map(|p| p.centre())
-                                }),
                                 Kind::Skin => views.skins.get(&panel.id).and_then(|v| {
                                     v.places.iter().find(|(n, _)| n == name).map(|(_, p)| *p)
                                 }),
@@ -342,46 +317,6 @@ pub fn chrome(
                             ui.label("first");
                             ui.add(egui::Slider::new(&mut scene.t, 0.0..=1.0).show_value(false));
                             ui.label("second");
-                        });
-                    });
-                }
-                // A drawing that moves gets its controls.
-                if let Some(d) = views.drawings.get_mut(&panel.id)
-                    && d.film.frames().len() > 1
-                {
-                    let last = (d.film.frames().len() - 1) as f32;
-                    let bar = egui::Rect::from_min_size(
-                        content.left_bottom() + egui::vec2(10.0, -36.0),
-                        egui::vec2(content.width().min(460.0), 28.0),
-                    );
-                    ui.painter().rect_filled(
-                        bar.expand(3.0),
-                        5.0,
-                        egui::Color32::from_rgba_unmultiplied(10, 12, 16, 200),
-                    );
-                    ui.scope_builder(egui::UiBuilder::new().max_rect(bar), |ui| {
-                        ui.horizontal(|ui| {
-                            if ui.button("replay").clicked() {
-                                d.clock = 0.0;
-                                d.playing = true;
-                            }
-                            if ui
-                                .button(if d.playing { "pause" } else { "play" })
-                                .clicked()
-                            {
-                                if !d.playing && d.clock >= d.film.length() {
-                                    d.clock = 0.0;
-                                }
-                                d.playing = !d.playing;
-                            }
-                            let mut at = d.film.position(d.clock);
-                            if ui
-                                .add(egui::Slider::new(&mut at, 0.0..=last).show_value(false))
-                                .changed()
-                            {
-                                d.clock = d.film.clock_at(at);
-                                d.playing = false;
-                            }
                         });
                     });
                 }

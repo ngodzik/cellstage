@@ -26,8 +26,6 @@ bevy = { version = "0.20.0", default-features = false, features = [
     "bevy_pbr", "bevy_light", "bevy_anti_alias", "mouse", "keyboard", "png",
 ] }
 bevy_egui = { version = "0.43.1", default-features = false, features = ["render", "default_fonts"] }
-resvg = "0.49.0"
-ttf-parser = "0.25"
 
 [profile.dev]
 opt-level = 1

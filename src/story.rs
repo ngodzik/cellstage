@@ -1,11 +1,11 @@
 //! Stories: what the stage shows, step by step, each step its panels, what
 //! fills them and the words that go with it. Every story is kept on disk as
 //! it is told, so that it can be told again at once, and found again by
-//! what it is about. Drawings worth reusing are kept beside the stories.
+//! what it is about.
 //!
-//! The library is a folder of JSON files, one per story and one per
-//! drawing, under the user's data directory: `~/.local/share/cellstage`,
-//! or `$CELLSTAGE_HOME` when it is set.
+//! The library is a folder of JSON files, one per story, under the user's
+//! data directory: `~/.local/share/cellstage`, or `$CELLSTAGE_HOME` when it
+//! is set.
 
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -25,7 +25,7 @@ pub struct Call {
 pub struct PanelSpec {
     pub id: String,
     pub title: String,
-    /// The call that filled it, `show_*` or `draw`.
+    /// The `show_*` call that filled it.
     #[serde(default)]
     pub show: Option<Call>,
     /// The notes written and the turns of the camera made after, in order.
@@ -164,93 +164,16 @@ impl Story {
     }
 }
 
-/// A drawing kept to be shown again: the `draw` call that made it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Drawing {
-    pub name: String,
-    pub title: String,
-    #[serde(default)]
-    pub caption: String,
-    pub args: Value,
-    pub updated: u64,
-}
-
-impl Drawing {
-    /// Keep a `draw` call under a name, replacing what had that name.
-    pub fn keep(name: &str, args: &Value) -> anyhow::Result<String> {
-        let name = slug(name);
-        anyhow::ensure!(!name.is_empty(), "a drawing's name needs letters");
-        let text = |k: &str| args.get(k).and_then(Value::as_str).unwrap_or("").to_owned();
-        let mut args = args.clone();
-        if let Some(map) = args.as_object_mut() {
-            map.remove("panel");
-            map.remove("name");
-        }
-        let title = text("title");
-        let drawing = Self {
-            name: name.clone(),
-            title: if title.is_empty() {
-                name.replace('-', " ")
-            } else {
-                title
-            },
-            caption: text("caption"),
-            args,
-            updated: now(),
-        };
-        let dir = home().join("drawings");
-        std::fs::create_dir_all(&dir)?;
-        std::fs::write(
-            dir.join(format!("{name}.json")),
-            serde_json::to_string_pretty(&drawing)?,
-        )?;
-        Ok(name)
-    }
-
-    /// A kept drawing, by name.
-    pub fn load(name: &str) -> anyhow::Result<Self> {
-        let file = home().join("drawings").join(format!("{}.json", slug(name)));
-        let text = std::fs::read_to_string(&file)
-            .map_err(|e| anyhow::anyhow!("no drawing {name} in the library ({e})"))?;
-        Ok(serde_json::from_str(&text)?)
-    }
-
-    fn words(&self) -> Vec<(String, u32)> {
-        let mut parts = String::new();
-        if let Some(map) = self.args.get("parts").and_then(Value::as_object) {
-            for (id, what) in map {
-                parts.push_str(&format!("{id} {} ", what.as_str().unwrap_or("")));
-            }
-        }
-        vec![
-            (fold(&self.name.replace('-', " ")), 4),
-            (fold(&self.title), 4),
-            (fold(&self.caption), 2),
-            (fold(&parts.replace('_', " ")), 1),
-        ]
-    }
-}
-
-/// What a search found.
-pub enum Found {
-    Story(Story),
-    Drawing(Drawing),
-}
-
-/// Stories and drawings that speak of what `query` asks, the best first.
-/// An empty query lists the latest stories.
-pub fn search(query: &str) -> Vec<Found> {
+/// Stories that speak of what `query` asks, the best first. An empty query
+/// lists the latest stories.
+pub fn search(query: &str) -> Vec<Story> {
     let terms: Vec<String> = fold(query)
         .split(|c: char| !c.is_alphanumeric())
         .filter(|w| w.len() > 1 && !STOP.contains(w))
         .map(str::to_owned)
         .collect();
     if terms.is_empty() {
-        return Story::all()
-            .into_iter()
-            .take(15)
-            .map(Found::Story)
-            .collect();
+        return Story::all().into_iter().take(15).collect();
     }
     let score = |words: &[(String, u32)]| -> u32 {
         terms
@@ -265,17 +188,11 @@ pub fn search(query: &str) -> Vec<Found> {
             })
             .sum()
     };
-    let mut found: Vec<(u32, Found)> = Vec::new();
+    let mut found: Vec<(u32, Story)> = Vec::new();
     for s in Story::all() {
         let n = score(&s.words());
         if n > 0 {
-            found.push((n, Found::Story(s)));
-        }
-    }
-    for d in read_dir::<Drawing>("drawings") {
-        let n = score(&d.words());
-        if n > 0 {
-            found.push((n, Found::Drawing(d)));
+            found.push((n, s));
         }
     }
     found.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
@@ -413,7 +330,7 @@ mod tests {
         story.steps[0].narration = "Les cellules quittent le tube neural.".into();
         story.save().expect("saved");
         let found = search("melanocytes crete");
-        assert!(matches!(found.first(), Some(Found::Story(s)) if s.id == "la-crete-neurale"));
+        assert!(found.first().is_some_and(|s| s.id == "la-crete-neurale"));
         assert_eq!(
             Story::load("la-crete-neurale").expect("loaded").steps.len(),
             1

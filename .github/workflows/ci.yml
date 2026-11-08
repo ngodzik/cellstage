@@ -48,13 +48,13 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
-      # cellstage shows only what it makes, and fetches what it reads, proteins
-      # and pathways, into the user's cache. Neither someone else's data nor a
-      # picture belongs in the repository.
-      - name: No data or pictures in the repository
+      # cellstage shows only what it builds, and fetches what it reads,
+      # proteins and pathways, into the user's cache. Neither someone else's
+      # data nor a picture nor a drawing belongs in the repository.
+      - name: No data, pictures or drawings in the repository
         run: |
-          if git ls-files | grep -E -i '\.(csv|tsv|xlsx|xls|parquet|h5|hdf5|mat|pdb|cif|bcif|png|jpe?g|gif|webp|tiff?)$'; then
-            echo "data or pictures are committed: cellstage fetches what it reads and makes what it shows"
+          if git ls-files | grep -E -i '\.(csv|tsv|xlsx|xls|parquet|h5|hdf5|mat|pdb|cif|bcif|png|jpe?g|gif|webp|tiff?|svg)$'; then
+            echo "data, pictures or drawings are committed: cellstage fetches what it reads and builds what it shows"
             exit 1
           fi
 

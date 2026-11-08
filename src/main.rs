@@ -3,21 +3,18 @@
 //! The program is a Model Context Protocol server over standard input and
 //! output, and a window. An agent connected to it, in a terminal or any
 //! client, tells a story in steps the user moves through with the arrow
-//! keys. Each step splits the window into panels and shows in them
-//! drawings the agent writes in SVG, from a house of shapes and templates
-//! with named parts, which move from one frame to the next; diagrams and
-//! charts the window lays out; pages of words; proteins at their measured
-//! atomic structure or as AlphaFold predicts them; a cell under a
+//! keys. Each step splits the window into panels and shows in them worlds
+//! built in three dimensions that the agent films; proteins at their
+//! measured atomic structure or as AlphaFold predicts them; a cell under a
 //! fluorescence microscope whose network cellweave runs live; stained
-//! tissue sections drawn from histology; worlds built in three dimensions
-//! that the agent films. The window makes everything it shows: it fetches
-//! no pictures from anywhere. Every
-//! story is kept in a library on disk, to be told again at once. The user
-//! turns and zooms what is shown, clicks on it, and the agent hears what
-//! was clicked.
+//! tissue sections drawn from histology. The window makes everything it
+//! shows: it fetches no pictures from anywhere, and the agent draws
+//! nothing. Every story is kept in a library on disk, to be told again at
+//! once. The user turns and zooms what is shown, clicks on it, and the
+//! agent hears what was clicked.
 //!
 //! Every panel says what it is: a measured or a predicted structure, a
-//! simulation, an illustration, a chart of numbers given.
+//! simulation, an illustration.
 
 #![deny(unsafe_code)]
 // The tools' descriptions are one long json! literal.
@@ -25,8 +22,6 @@
 
 mod cell;
 mod chrome;
-mod drawing;
-mod figure;
 mod mcp;
 mod protein;
 mod scene;
@@ -52,10 +47,9 @@ use bevy::winit::{EventLoopProxyWrapper, UpdateMode, WinitSettings, WinitUserEve
 use bevy_egui::{EguiGlobalSettings, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext};
 
 use crate::cell::specimen::{self, Channel};
-use crate::drawing::Canvas;
 use crate::mcp::{Message, Reply};
 use crate::scene::Scenes;
-use crate::stage::{Kind, Stage};
+use crate::stage::Stage;
 use crate::story::Story;
 use crate::tools::{Mode, Views};
 
@@ -68,14 +62,14 @@ const DYES: [[f32; 3]; 3] = [specimen::GREEN, specimen::RED, specimen::MAGENTA];
 
 fn main() -> anyhow::Result<()> {
     let (to_window, inbox) = channel();
-    drawing::warm();
     world::warm();
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             title: "cellstage".to_owned(),
             resolution: (1600, 960).into(),
-            // Shown when the agent first draws, not when it connects.
+            // Shown when the agent first shows something, not when it
+            // connects.
             visible: false,
             ..default()
         }),
@@ -85,7 +79,7 @@ fn main() -> anyhow::Result<()> {
     }))
     .add_plugins(EguiPlugin::default())
     .add_plugins((world::glow::GlowPlugin, world::surface::SurfacePlugin))
-    // Hidden until the agent first draws, so asleep until then.
+    // Hidden until the agent first shows something, so asleep until then.
     .insert_resource(asleep())
     .insert_resource(ClearColor(scene::BACKGROUND))
     .insert_resource(Inbox(Mutex::new(inbox)))
@@ -104,7 +98,6 @@ fn main() -> anyhow::Result<()> {
         (
             bridge,
             live_cells,
-            render_drawings,
             scene::place,
             world::run,
             hide_on_close,
@@ -161,7 +154,7 @@ fn setup(mut commands: Commands, mut egui: ResMut<EguiGlobalSettings>) {
     ));
 }
 
-/// Hide the window when the user closes it: the agent may draw again.
+/// Hide the window when the user closes it: the agent may show more.
 fn hide_on_close(
     mut closed: MessageReader<WindowCloseRequested>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
@@ -216,60 +209,6 @@ fn bridge(world: &mut World) {
             }
             Message::Call(call) => match call.tool.as_str() {
                 "screenshot" => screenshot(world, call.reply),
-                "drawing_kit" => {
-                    let args = &call.args;
-                    let picture =
-                        args.get("picture").and_then(serde_json::Value::as_bool) == Some(true);
-                    let template = args.get("template").and_then(serde_json::Value::as_str);
-                    let page = args
-                        .get("page")
-                        .and_then(serde_json::Value::as_u64)
-                        .unwrap_or(1) as usize;
-                    let (text, sheet) = match template {
-                        Some(name) => match drawing::templates::find(name) {
-                            Some(t) => (
-                                tools::template_parts(t),
-                                if picture {
-                                    Some(drawing::template_sheet(name))
-                                } else {
-                                    None
-                                },
-                            ),
-                            None => (
-                                format!(
-                                    "No template {name}; there are {}.",
-                                    drawing::templates::names().join(", ")
-                                ),
-                                None,
-                            ),
-                        },
-                        None => {
-                            let mut text = drawing::kit();
-                            text.push_str(&format!(
-                                "\n\nThe kit's picture has {} pages: picture with page 1 to {} for the shapes, page {} for the colours.",
-                                drawing::kit_pages(),
-                                drawing::kit_pages() - 1,
-                                drawing::kit_pages()
-                            ));
-                            let sheet = picture.then(|| {
-                                drawing::kit_sheet(page).ok_or_else(|| format!("no page {page}"))
-                            });
-                            (text, sheet)
-                        }
-                    };
-                    let mut reply = Reply::text(text);
-                    if let Some(sheet) = sheet {
-                        match sheet.and_then(|s| drawing::picture_of(&s, 1100)).and_then(
-                            |(rgba, w, h): (Vec<u8>, u32, u32)| {
-                                encode(&rgba, w, h, 4).map_err(|e| e.to_string())
-                            },
-                        ) {
-                            Ok(png) => reply.image = Some(png),
-                            Err(e) => reply.text.push_str(&format!("\n(no picture: {e})")),
-                        }
-                    }
-                    let _ = call.reply.send(reply);
-                }
                 _ => {
                     let reply = match tools::handle(world, &call.tool, &call.args, Mode::Record) {
                         Ok(text) => Reply::text(text),
@@ -293,7 +232,7 @@ fn bridge(world: &mut World) {
                     stage.story = Some(story);
                     stage.step = 0;
                 }
-                tools::show_step(world, 0, false);
+                tools::show_step(world, 0);
                 world.resource_mut::<Stage>().events.push(format!(
                     "The user opened the story \"{title}\" ({id}) from the library."
                 ));
@@ -302,8 +241,7 @@ fn bridge(world: &mut World) {
         }
     }
     if let Some(n) = goto {
-        let forward = n == world.resource::<Stage>().step + 1;
-        tools::show_step(world, n, forward);
+        tools::show_step(world, n);
         let mut stage = world.resource_mut::<Stage>();
         let said = stage.story.as_ref().map(|s| {
             format!(
@@ -339,7 +277,7 @@ fn bridge(world: &mut World) {
 fn screenshot(world: &mut World, reply: Sender<Reply>) {
     if !world.resource::<Stage>().shown {
         let _ = reply.send(Reply::error(
-            "the window is not shown yet: draw something first",
+            "the window is not shown yet: show something first",
         ));
         return;
     }
@@ -486,79 +424,5 @@ fn live_cells(time: Res<Time>, mut views: ResMut<Views>, mut images: ResMut<Asse
             view.specimen
                 .expose(&channels, view.dish.fate, view.frame, data);
         }
-    }
-}
-
-/// Render every drawing that changed: its film moved on, its panel moved
-/// or zoomed. A drawing is rendered at the panel's size in pixels, so that
-/// it stays sharp however far in the user goes.
-fn render_drawings(
-    time: Res<Time>,
-    stage: Res<Stage>,
-    mut views: ResMut<Views>,
-    mut images: ResMut<Assets<Image>>,
-) {
-    let dt = time.delta_secs();
-    let ppp = stage.pixels_per_point;
-    for panel in &stage.panels {
-        if panel.kind != Kind::Drawing || !panel.rect.is_positive() {
-            continue;
-        }
-        let Some(view) = views.drawings.get_mut(&panel.id) else {
-            continue;
-        };
-        if view.playing {
-            view.clock += dt;
-            if !view.film.looping && view.clock >= view.film.length() {
-                view.clock = view.film.length();
-                view.playing = false;
-            }
-        }
-        let content = panel.content();
-        let image_rect = stage::image_rect(content, view.size, panel.zoom, panel.pan);
-        let position = view.film.position(view.clock);
-        // A drawing on the move is rendered at half the pixels, which the
-        // eye does not see, and sharp again once it stands still.
-        let last = view.film.frames().len().saturating_sub(1) as f32;
-        let moving = position.fract() > 0.002 && position < last;
-        let ppp = if moving && content.area() * ppp * ppp > 250_000.0 {
-            ppp * 0.5
-        } else {
-            ppp
-        };
-        let (w, h) = (
-            (content.width() * ppp).round().max(1.0) as u32,
-            (content.height() * ppp).round().max(1.0) as u32,
-        );
-        let canvas = Canvas {
-            width: w,
-            height: h,
-            scale: image_rect.width() / view.size.0 * ppp,
-            offset: (
-                (image_rect.left() - content.left()) * ppp,
-                (image_rect.top() - content.top()) * ppp,
-            ),
-            background: view.background,
-        };
-        if view.last == Some((position, canvas)) {
-            continue;
-        }
-        match drawing::render(&view.film.picture(position), &canvas) {
-            Ok((pixels, parts)) => {
-                if let Some(mut image) = images.get_mut(&view.image) {
-                    if image.width() != w || image.height() != h {
-                        image.resize(Extent3d {
-                            width: w,
-                            height: h,
-                            depth_or_array_layers: 1,
-                        });
-                    }
-                    image.data = Some(pixels);
-                }
-                view.parts = parts;
-            }
-            Err(e) => warn!("panel {}: {e}", panel.id),
-        }
-        view.last = Some((position, canvas));
     }
 }

@@ -7,17 +7,15 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 use bevy_egui::egui;
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use crate::cell::dish::{Dish, Fate, GENES, Switch, label};
 use crate::cell::specimen::{self, Compartment, Specimen};
-use crate::drawing::{self, Canvas, Film, Part, Picture, Sheet};
-use crate::figure::{self, Figure};
 use crate::protein::{self, Highlight, Look};
 use crate::scene::{self, Scenes, Style};
 use crate::sources;
 use crate::stage::{Anchor, Arrangement, Kind, MAX_PANELS, Note, Panel, Stage};
-use crate::story::{self, Call, Drawing, Found, PanelSpec, Step, Story};
+use crate::story::{self, Call, PanelSpec, Step, Story};
 use crate::tissue::skin::{self, Lesion, Section};
 
 /// A cell panel: the dish, the microscope, the picture.
@@ -40,28 +38,10 @@ pub struct SkinView {
     pub places: Vec<(String, (f32, f32))>,
 }
 
-/// A drawing panel: its frames, where it is in them, its picture.
-pub struct DrawView {
-    pub film: Film,
-    /// Its size in drawing units.
-    pub size: (f32, f32),
-    pub clock: f32,
-    pub playing: bool,
-    pub background: [u8; 3],
-    pub image: Handle<Image>,
-    /// Its named parts as last rendered, in drawing units.
-    pub parts: Vec<Part>,
-    /// What the agent said its parts are.
-    pub described: Vec<(String, String)>,
-    /// What was last rendered, so that nothing is rendered twice.
-    pub last: Option<(f32, Canvas)>,
-}
-
 #[derive(Resource, Default)]
 pub struct Views {
     pub cells: HashMap<String, CellView>,
     pub skins: HashMap<String, SkinView>,
-    pub drawings: HashMap<String, DrawView>,
 }
 
 /// Whether a call is the agent's, to be kept in the story, or the stage
@@ -102,8 +82,7 @@ pub fn handle(world: &mut World, tool: &str, args: &Value, mode: Mode) -> Result
         "story_edit" => story_edit(world, args),
         "story_goto" => {
             let n = step_number(world, args)?;
-            let forward = n == world.resource::<Stage>().step + 1;
-            show_step(world, n, forward);
+            show_step(world, n);
             Ok(format!("Showing step {}. {}", n + 1, step_summary(world)))
         }
         "story_remove_step" => story_remove_step(world, args),
@@ -124,11 +103,7 @@ pub fn handle(world: &mut World, tool: &str, args: &Value, mode: Mode) -> Result
             })
         }
         _ => {
-            let args = if tool == "draw" && mode == Mode::Record {
-                resolve_drawing(args)?
-            } else {
-                args.clone()
-            };
+            let args = args.clone();
             if mode == Mode::Record {
                 ensure_story(world);
             }
@@ -137,10 +112,6 @@ pub fn handle(world: &mut World, tool: &str, args: &Value, mode: Mode) -> Result
                 "show_protein" => show_protein(world, &args),
                 "show_cell" => show_cell(world, &args),
                 "show_skin" => show_skin(world, &args),
-                "draw" => draw(world, &args),
-                "show_diagram" => show_diagram(world, &args),
-                "show_chart" => show_chart(world, &args),
-                "show_text" => show_text(world, &args),
                 "show_world" => show_world(world, &args),
                 "annotate" => annotate(world, &args),
                 "clear_annotations" => {
@@ -159,40 +130,10 @@ pub fn handle(world: &mut World, tool: &str, args: &Value, mode: Mode) -> Result
                 return Ok(answer);
             }
             record(world, tool, &args);
-            let mut answer = answer;
-            if tool == "draw"
-                && let Some(name) = text(&args, "name")
-            {
-                match Drawing::keep(&name, &args) {
-                    Ok(name) => {
-                        answer.push_str(&format!(" Kept in the library as the drawing {name}."))
-                    }
-                    Err(e) => answer.push_str(&format!(" Could not keep it: {e}.")),
-                }
-            }
             let stage = world.resource::<Stage>();
             Ok(format!("{answer} {}", stage.whereabouts()))
         }
     }
-}
-
-/// A `draw` call that names a kept drawing and gives no SVG: the kept call,
-/// with what this one says over it.
-fn resolve_drawing(args: &Value) -> Result<Value, String> {
-    let has_svg = args.get("svg").is_some() || args.get("frames").is_some();
-    let Some(name) = text(args, "name").filter(|_| !has_svg) else {
-        return Ok(args.clone());
-    };
-    let kept = Drawing::load(&name).map_err(|e| e.to_string())?;
-    let mut merged: Map<String, Value> = kept.args.as_object().cloned().unwrap_or_default();
-    if let Some(map) = args.as_object() {
-        for (k, v) in map {
-            if k != "name" {
-                merged.insert(k.clone(), v.clone());
-            }
-        }
-    }
-    Ok(Value::Object(merged))
 }
 
 /// Take away whatever a panel showed.
@@ -202,7 +143,6 @@ fn forget(world: &mut World, id: &str) {
     let mut views = world.resource_mut::<Views>();
     views.cells.remove(id);
     views.skins.remove(id);
-    views.drawings.remove(id);
 }
 
 fn layout(world: &mut World, args: &Value) -> Result<String, String> {
@@ -307,10 +247,6 @@ fn prepare(
         .ok_or("six panels at most; lay them out again to make room")?;
     if panel.kind != kind {
         panel.notes.clear();
-        panel.zoom = 1.0;
-        panel.pan = egui::Vec2::ZERO;
-    }
-    if kind == Kind::Drawing {
         panel.zoom = 1.0;
         panel.pan = egui::Vec2::ZERO;
     }
@@ -781,268 +717,6 @@ fn show_skin(world: &mut World, args: &Value) -> Result<String, String> {
     Ok(answer)
 }
 
-/// The page a drawing is drawn on.
-fn background(args: &Value) -> [u8; 3] {
-    match text(args, "background").as_deref() {
-        Some("dark") => [16, 19, 24],
-        Some(hex) if hex.starts_with('#') => colour(hex)
-            .map(|c| c.map(|v| (v * 255.0) as u8))
-            .unwrap_or([247, 245, 240]),
-        _ => [247, 245, 240],
-    }
-}
-
-/// What a panel that shows a drawing says of itself, besides being one.
-struct Labelled {
-    label: Option<String>,
-    source: Option<String>,
-    title: &'static str,
-    /// What the parts are, from whatever made the drawing.
-    described: Vec<(String, String)>,
-    /// Whether the answer names every part; a chart's points are many.
-    name_parts: bool,
-}
-
-impl Labelled {
-    fn drawing() -> Self {
-        Self {
-            label: None,
-            source: None,
-            title: "A drawing",
-            described: Vec::new(),
-            name_parts: true,
-        }
-    }
-}
-
-fn draw(world: &mut World, args: &Value) -> Result<String, String> {
-    let mut inputs: Vec<String> = Vec::new();
-    if let Some(svg) = text(args, "svg") {
-        inputs.push(svg);
-    }
-    if let Some(list) = args.get("frames").and_then(Value::as_array) {
-        inputs.extend(list.iter().filter_map(|f| f.as_str().map(str::to_owned)));
-    }
-    if inputs.is_empty() {
-        return Err("give svg, or frames, or the name of a drawing kept in the library".to_owned());
-    }
-    let size = args
-        .get("view_box")
-        .and_then(Value::as_array)
-        .and_then(|a| Some((a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32)));
-    let size = Sheet::read(&inputs[0], size).size;
-    if inputs
-        .iter()
-        .any(|i| i.contains("<image") || i.contains("<feImage"))
-    {
-        return Err("a drawing takes no pictures: the window draws everything it shows. Draw it with shapes and templates, or tell the user cellstage cannot show it".to_owned());
-    }
-    // Shorthands written out first, so that changes may name what they
-    // made.
-    let mut inputs: Vec<String> = inputs
-        .iter()
-        .enumerate()
-        .map(|(k, i)| drawing::macros::expand(i, size).map_err(|e| format!("frame {}: {e}", k + 1)))
-        .collect::<Result<_, _>>()?;
-    // Frames given by what changes from the frame before.
-    if let Some(list) = args.get("changes").and_then(Value::as_array) {
-        let mut last = inputs.last().cloned().unwrap_or_default();
-        for (k, frame) in list.iter().enumerate() {
-            let mut edits = Vec::new();
-            for (id, attributes) in frame.as_object().into_iter().flatten() {
-                for (attribute, value) in attributes.as_object().into_iter().flatten() {
-                    let value = match value {
-                        Value::String(s) => s.clone(),
-                        other => other.to_string(),
-                    };
-                    edits.push((id.clone(), attribute.clone(), value));
-                }
-            }
-            // An attribute brought in by a change is given its neutral
-            // value in the frames before, so that they move into it rather
-            // than fade.
-            for (id, attribute, value) in &edits {
-                if drawing::attribute(&last, id, attribute).is_none()
-                    && let Some(neutral) = drawing::neutral(attribute, value)
-                {
-                    let edit = [(id.clone(), attribute.clone(), neutral)];
-                    for frame in inputs.iter_mut() {
-                        if drawing::attribute(frame, id, attribute).is_none() {
-                            *frame =
-                                drawing::changed(frame, &edit).unwrap_or_else(|_| frame.clone());
-                        }
-                    }
-                    last = drawing::changed(&last, &edit).unwrap_or(last);
-                }
-            }
-            last = drawing::changed(&last, &edits).map_err(|e| format!("change {}: {e}", k + 1))?;
-            inputs.push(last.clone());
-        }
-    }
-    stage_drawing(world, args, inputs, size, Labelled::drawing())
-}
-
-/// A figure the window laid out, shown as a drawing.
-fn show_figure(
-    world: &mut World,
-    args: &Value,
-    figure: Result<Figure, String>,
-    mut how: Labelled,
-) -> Result<String, String> {
-    let figure = figure?;
-    how.described = figure.parts;
-    let svg = format!(
-        "<svg viewBox=\"0 0 {} {}\">{}</svg>",
-        figure.size.0, figure.size.1, figure.svg
-    );
-    stage_drawing(world, args, vec![svg], figure.size, how)
-}
-
-/// Put a drawing's frames in a panel.
-fn stage_drawing(
-    world: &mut World,
-    args: &Value,
-    inputs: Vec<String>,
-    size: (f32, f32),
-    how: Labelled,
-) -> Result<String, String> {
-    let sheets: Vec<Sheet> = inputs.iter().map(|i| Sheet::read(i, Some(size))).collect();
-    let documents = drawing::documents(&sheets);
-    // Read every frame now, so that a mistake is told while the agent is
-    // still drawing.
-    let probe = Canvas {
-        width: 16,
-        height: 10,
-        scale: 16.0 / size.0,
-        offset: (0.0, 0.0),
-        background: [0, 0, 0],
-    };
-    let mut parts = Vec::new();
-    for (k, d) in documents.iter().enumerate() {
-        let (_, p) = drawing::render(&Picture::Still(d), &probe)
-            .map_err(|e| format!("frame {}: {e}", k + 1))?;
-        if k == 0 {
-            parts = p;
-        }
-    }
-    let mut described = drawing::macros::descriptions(&inputs[0]);
-    for (id, what) in how.described.into_iter().chain(
-        args.get("parts")
-            .and_then(Value::as_object)
-            .into_iter()
-            .flatten()
-            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_owned())),
-    ) {
-        described.retain(|(i, _)| *i != id);
-        described.push((id, what));
-    }
-    let frames = documents.len();
-    let seconds = number(args, "seconds").unwrap_or(2.0) as f32;
-    let hold = number(args, "hold").unwrap_or(0.8) as f32;
-    let looping = args.get("loop").and_then(Value::as_bool).unwrap_or(false);
-    let film = Film::new(documents, hold, seconds, looping);
-    let length = film.length();
-    let id = prepare(world, args, Kind::Drawing, how.title)?;
-    let image = world
-        .resource_mut::<Assets<Image>>()
-        .add(crate::blank(16, 16));
-    world.resource_mut::<Views>().drawings.insert(
-        id.clone(),
-        DrawView {
-            film,
-            size,
-            clock: 0.0,
-            playing: frames > 1,
-            background: background(args),
-            image: image.clone(),
-            parts: parts.clone(),
-            described,
-            last: None,
-        },
-    );
-    if let Some(panel) = world
-        .resource_mut::<Stage>()
-        .panels
-        .iter_mut()
-        .find(|p| p.id == id)
-    {
-        panel.image = Some(image);
-        panel.texture = None;
-        panel.label = how.label;
-        panel.source = match (how.source, frames > 1) {
-            (Some(s), _) => s,
-            (None, true) => format!("{frames} frames"),
-            (None, false) => String::new(),
-        };
-    }
-    let mut ids: Vec<&str> = parts.iter().map(|p| p.id.as_str()).collect();
-    ids.dedup();
-    let mut answer = format!("Shown in panel {id}, {} by {} units", size.0, size.1);
-    if frames > 1 {
-        answer.push_str(&format!(", {frames} frames over {length:.1} s"));
-    }
-    answer.push('.');
-    if how.name_parts {
-        if ids.is_empty() {
-            answer.push_str(" It has no named parts: give ids to what you will point at.");
-        } else {
-            answer.push_str(&format!(
-                " Parts to point at with annotate on=: {}.",
-                ids.join(", ")
-            ));
-        }
-    }
-    Ok(answer)
-}
-
-fn show_diagram(world: &mut World, args: &Value) -> Result<String, String> {
-    show_figure(
-        world,
-        args,
-        figure::diagram::diagram(args),
-        Labelled {
-            label: Some("SCHEMATIC · laid out from the agent's nodes and edges".to_owned()),
-            title: "A diagram",
-            ..Labelled::drawing()
-        },
-    )
-}
-
-fn show_chart(world: &mut World, args: &Value) -> Result<String, String> {
-    let source = text(args, "source").unwrap_or_default();
-    let chart = figure::chart::chart(args)?;
-    let series: Vec<String> = chart.parts.iter().map(|(id, _)| id.clone()).collect();
-    let answer = show_figure(
-        world,
-        args,
-        Ok(chart),
-        Labelled {
-            label: Some("CHART · numbers given by the agent".to_owned()),
-            source: Some(format!("from {source}")),
-            title: "A chart",
-            name_parts: false,
-            ..Labelled::drawing()
-        },
-    )?;
-    Ok(format!(
-        "{answer} Series to point at: {}; each point or bar is the series id with _1, _2... after it.",
-        series.join(", ")
-    ))
-}
-
-fn show_text(world: &mut World, args: &Value) -> Result<String, String> {
-    show_figure(
-        world,
-        args,
-        figure::page::page(args),
-        Labelled {
-            label: Some("TEXT · written by the agent".to_owned()),
-            title: "Notes",
-            ..Labelled::drawing()
-        },
-    )
-}
-
 /// Open a world in a panel, or keep the one it shows, and play the film
 /// the agent directs in it.
 fn show_world(world: &mut World, args: &Value) -> Result<String, String> {
@@ -1162,9 +836,7 @@ fn annotate(world: &mut World, args: &Value) -> Result<String, String> {
 /// are.
 fn find_place(world: &World, panel: &str, on: &str) -> Result<String, String> {
     let views = world.resource::<Views>();
-    let names: Vec<String> = if let Some(d) = views.drawings.get(panel) {
-        d.parts.iter().map(|p| p.id.clone()).collect()
-    } else if let Some(s) = views.skins.get(panel) {
+    let names: Vec<String> = if let Some(s) = views.skins.get(panel) {
         s.places.iter().map(|(n, _)| n.clone()).collect()
     } else if let Some(c) = views.cells.get(panel) {
         c.places.iter().map(|(n, _)| n.clone()).collect()
@@ -1174,7 +846,7 @@ fn find_place(world: &World, panel: &str, on: &str) -> Result<String, String> {
             .map(str::to_owned)
             .collect()
     } else {
-        return Err("on= points at a part of a drawing, a section, a cell or a world; on a protein, give chain and residue".to_owned());
+        return Err("on= points at a place in a world, a section or a cell; on a protein, give chain and residue".to_owned());
     };
     let wanted = story::fold(&bare(on));
     names
@@ -1228,19 +900,7 @@ fn now() -> u64 {
 }
 
 /// The calls that fill a panel.
-const SHOWS: [&str; 8] = [
-    "show_protein",
-    "show_world",
-    "show_skin",
-    "show_cell",
-    "draw",
-    "show_diagram",
-    "show_chart",
-    "show_text",
-];
-
-/// The calls whose panel is a drawing, which can move into one another.
-const DRAWN: [&str; 4] = ["draw", "show_diagram", "show_chart", "show_text"];
+const SHOWS: [&str; 4] = ["show_protein", "show_world", "show_skin", "show_cell"];
 
 /// Keep a call in the step on screen: its panels as the stage now has
 /// them, and what the call put in its panel.
@@ -1345,9 +1005,8 @@ fn record(world: &mut World, tool: &str, args: &Value) {
 }
 
 /// Show step `n` of the story: its panels, what fills them, its notes.
-/// Panels that already show what the step wants are left as they are; a
-/// drawing that changes on the way forward moves from what it was.
-pub fn show_step(world: &mut World, n: usize, forward: bool) {
+/// Panels that already show what the step wants are left as they are.
+pub fn show_step(world: &mut World, n: usize) {
     let step = {
         let stage = world.resource::<Stage>();
         let Some(step) = stage.story.as_ref().and_then(|s| s.steps.get(n)) else {
@@ -1370,35 +1029,16 @@ pub fn show_step(world: &mut World, n: usize, forward: bool) {
             .find(|p| p.id == spec.id)
             .and_then(|p| p.shown.clone());
         if spec.show != current {
-            // The frame a drawing showed, to move from.
-            let from = match (&spec.show, &current) {
-                (Some(new), Some(old))
-                    if forward
-                        && DRAWN.contains(&new.tool.as_str())
-                        && DRAWN.contains(&old.tool.as_str()) =>
-                {
-                    world.resource::<Views>().drawings.get(&spec.id).map(|d| {
-                        let last = d.film.frames().len().saturating_sub(1);
-                        d.film.frames()[last].clone()
-                    })
-                }
-                _ => None,
-            };
             match &spec.show {
                 None => clear_panel(world, &spec.id),
                 Some(call) => {
+                    // A call cellstage no longer makes, such as a drawing
+                    // kept from an earlier version, leaves its panel empty.
                     if let Err(e) = handle(world, &call.tool, &call.args, Mode::Replay) {
                         warn!("step {} panel {}: {e}", n + 1, spec.id);
+                        clear_panel(world, &spec.id);
                     }
                 }
-            }
-            if let Some(frame) = from
-                && let Some(d) = world.resource_mut::<Views>().drawings.get_mut(&spec.id)
-                && d.film.frames().first() != Some(&frame)
-            {
-                d.film.begin_from(frame);
-                d.clock = 0.0;
-                d.playing = true;
             }
             if let Some(p) = world
                 .resource_mut::<Stage>()
@@ -1408,12 +1048,6 @@ pub fn show_step(world: &mut World, n: usize, forward: bool) {
             {
                 p.shown = spec.show.clone();
             }
-        } else if let Some(d) = world.resource_mut::<Views>().drawings.get_mut(&spec.id)
-            && d.film.frames().len() > 1
-        {
-            // The same drawing: played again from its start.
-            d.clock = 0.0;
-            d.playing = true;
         }
         if let Some(p) = world
             .resource_mut::<Stage>()
@@ -1514,7 +1148,7 @@ fn story_new(world: &mut World, args: &Value) -> Result<String, String> {
         stage.step = 0;
         stage.dirty = true;
     }
-    show_step(world, 0, false);
+    show_step(world, 0);
     reveal(world);
     Ok(format!(
         "Began the story {id}, at its first step, empty: lay it out and fill it, then story_step for the next. It is kept in the library as you go."
@@ -1554,7 +1188,7 @@ fn story_step(world: &mut World, args: &Value) -> Result<String, String> {
         stage.dirty = true;
         n
     };
-    show_step(world, n, true);
+    show_step(world, n);
     Ok(format!(
         "Now at step {} of {}{}.",
         n + 1,
@@ -1619,7 +1253,7 @@ fn story_remove_step(world: &mut World, args: &Value) -> Result<String, String> 
         stage.dirty = true;
         next
     };
-    show_step(world, next, false);
+    show_step(world, next);
     Ok(format!("Removed step {}. {}", n + 1, step_summary(world)))
 }
 
@@ -1637,7 +1271,7 @@ fn story_open(world: &mut World, args: &Value) -> Result<String, String> {
         stage.story = Some(story);
         stage.step = n;
     }
-    show_step(world, n, false);
+    show_step(world, n);
     reveal(world);
     Ok(format!(
         "Opened. {outline}\nShowing step {}; the user moves through the steps with the arrow keys. {}",
@@ -1653,25 +1287,8 @@ fn library_search(args: &Value) -> String {
         return "Nothing in the library speaks of that yet. Begin a story with story_new; it is kept as you tell it.".to_owned();
     }
     let mut out = vec!["In the library:".to_owned()];
-    for f in found {
-        match f {
-            Found::Story(s) => out.push(s.outline()),
-            Found::Drawing(d) => out.push(format!(
-                "drawing {}: \"{}\"{}",
-                d.name,
-                d.title,
-                if d.caption.is_empty() {
-                    String::new()
-                } else {
-                    format!(", {}", d.caption)
-                }
-            )),
-        }
-    }
-    out.push(
-        "Open a story with story_open {id}; show a kept drawing with draw {panel, name}."
-            .to_owned(),
-    );
+    out.extend(found.iter().map(Story::outline));
+    out.push("Open a story with story_open {id}.".to_owned());
     out.join("\n")
 }
 
@@ -1698,16 +1315,4 @@ pub fn library_list() -> Vec<(String, String, usize, String)> {
             (s.id, s.title, s.steps.len(), changed)
         })
         .collect()
-}
-
-/// The kit's picture, for the agent to see the shapes.
-pub fn template_parts(t: &drawing::templates::Template) -> String {
-    let mut out = format!(
-        "Template {}: {} Drawn {} by {}; set it with <insert name=\"{}\" x y width/>. Its parts, to point at with annotate on= or recolour:\n",
-        t.name, t.what, t.view[2], t.view[3], t.name
-    );
-    for (id, what) in &t.parts {
-        out.push_str(&format!("- {id}: {what}\n"));
-    }
-    out
 }
