@@ -1,5 +1,7 @@
 # cellstage
 
+[![CI](https://github.com/ngodzik/cellstage/actions/workflows/ci.yml/badge.svg)](https://github.com/ngodzik/cellstage/actions/workflows/ci.yml) [![Security](https://github.com/ngodzik/cellstage/actions/workflows/security.yml/badge.svg)](https://github.com/ngodzik/cellstage/actions/workflows/security.yml)
+
 A window an agent tells biology on, step by step.
 
 cellstage is a [Model Context Protocol](https://modelcontextprotocol.io) server and a window. An agent connected to it, Claude Code in a terminal or any other client, tells a story in steps, and the user moves through them with the arrow keys, as through a course. Each step has a few words, shown under the pictures, and one to six panels showing:

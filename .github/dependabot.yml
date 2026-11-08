@@ -1,0 +1,32 @@
+version: 2
+
+updates:
+  # Security fixes arrive as dependency bumps, so an unattended project needs
+  # something that opens the pull request on its own.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: saturday
+      time: "08:00"
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # The actions in the workflows are dependencies too, and the ones that go
+  # stale quietly are the ones nobody thinks of.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: saturday
+      time: "08:00"
+      timezone: Europe/Paris
+    ignore:
+      # The branches of this action are toolchain names, not releases: @stable
+      # installs stable and @1.97 installs 1.97. Dependabot reads the second as
+      # a version and offers to raise it, which would quietly stop the job from
+      # testing the minimum toolchain Cargo.toml promises.
+      - dependency-name: dtolnay/rust-toolchain

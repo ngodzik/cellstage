@@ -9,9 +9,9 @@ description  = "A stage an agent draws biology on: proteins, cells, tissues, and
 publish      = false
 
 [dependencies]
-cellweave-core   = { git = "https://github.com/ngodzik/cellweave", tag = "v0.3.0" }
-cellweave-engine = { git = "https://github.com/ngodzik/cellweave", tag = "v0.3.0" }
-cellweave-io     = { git = "https://github.com/ngodzik/cellweave", tag = "v0.3.0" }
+cellweave-core   = { git = "https://github.com/ngodzik/cellweave", tag = "v0.3.0", version = "0.3.0" }
+cellweave-engine = { git = "https://github.com/ngodzik/cellweave", tag = "v0.3.0", version = "0.3.0" }
+cellweave-io     = { git = "https://github.com/ngodzik/cellweave", tag = "v0.3.0", version = "0.3.0" }
 anyhow           = "1"
 base64           = "0.22"
 png              = "0.18"
