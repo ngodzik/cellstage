@@ -1,0 +1,428 @@
+//! cellstage: a window an agent tells biology on, step by step.
+//!
+//! The program is a Model Context Protocol server over standard input and
+//! output, and a window. An agent connected to it, in a terminal or any
+//! client, tells a story in steps the user moves through with the arrow
+//! keys. Each step splits the window into panels and shows in them worlds
+//! built in three dimensions that the agent films; proteins at their
+//! measured atomic structure or as AlphaFold predicts them; a cell under a
+//! fluorescence microscope whose network cellweave runs live; stained
+//! tissue sections drawn from histology. The window makes everything it
+//! shows: it fetches no pictures from anywhere, and the agent draws
+//! nothing. Every story is kept in a library on disk, to be told again at
+//! once. The user turns and zooms what is shown, clicks on it, and the
+//! agent hears what was clicked.
+//!
+//! Every panel says what it is: a measured or a predicted structure, a
+//! simulation, an illustration.
+
+#![deny(unsafe_code)]
+// The tools' descriptions are one long json! literal.
+#![recursion_limit = "512"]
+
+mod cell;
+mod chrome;
+mod mcp;
+mod protein;
+mod scene;
+mod sources;
+mod stage;
+mod story;
+mod tissue;
+mod tools;
+mod world;
+
+use std::sync::Mutex;
+use std::sync::mpsc::{Receiver, Sender, channel};
+use std::time::Duration;
+
+use bevy::asset::RenderAssetUsages;
+use bevy::camera::CameraOutputMode;
+use bevy::camera::visibility::RenderLayers;
+use bevy::prelude::*;
+use bevy::render::render_resource::{BlendState, Extent3d, TextureDimension, TextureFormat};
+use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
+use bevy::window::{ExitCondition, PrimaryWindow, WindowCloseRequested};
+use bevy::winit::{EventLoopProxyWrapper, UpdateMode, WinitSettings, WinitUserEvent};
+use bevy_egui::{EguiGlobalSettings, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext};
+
+use crate::cell::specimen::{self, Channel};
+use crate::mcp::{Message, Reply};
+use crate::scene::Scenes;
+use crate::stage::Stage;
+use crate::story::Story;
+use crate::tools::{Mode, Views};
+
+/// Tool calls from the protocol's thread.
+#[derive(Resource)]
+struct Inbox(Mutex<Receiver<Message>>);
+
+/// The dyes of the cell's three protein channels.
+const DYES: [[f32; 3]; 3] = [specimen::GREEN, specimen::RED, specimen::MAGENTA];
+
+fn main() -> anyhow::Result<()> {
+    let (to_window, inbox) = channel();
+    world::warm();
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: "cellstage".to_owned(),
+            resolution: (1600, 960).into(),
+            // Shown when the agent first shows something, not when it
+            // connects.
+            visible: false,
+            ..default()
+        }),
+        exit_condition: ExitCondition::DontExit,
+        close_when_requested: false,
+        ..default()
+    }))
+    .add_plugins(EguiPlugin::default())
+    .add_plugins((world::glow::GlowPlugin, world::surface::SurfacePlugin))
+    // Hidden until the agent first shows something, so asleep until then.
+    .insert_resource(asleep())
+    .insert_resource(ClearColor(scene::BACKGROUND))
+    .insert_resource(Inbox(Mutex::new(inbox)))
+    .insert_resource(Stage::default())
+    .insert_resource(Scenes::default())
+    .insert_resource(world::Worlds::default())
+    .insert_resource(Views::default())
+    .insert_resource(GlobalAmbientLight {
+        color: Color::srgb(0.75, 0.8, 1.0),
+        brightness: 120.0,
+        ..default()
+    })
+    .add_systems(Startup, setup)
+    .add_systems(
+        Update,
+        (
+            bridge,
+            live_cells,
+            scene::place,
+            world::run,
+            hide_on_close,
+            pace,
+        )
+            .chain(),
+    )
+    .add_systems(EguiPrimaryContextPass, chrome::chrome);
+    // The loop sleeps while the window is hidden: each message from the
+    // agent wakes it.
+    let proxy = (*app.world().resource::<EventLoopProxyWrapper>()).clone();
+    std::thread::spawn(move || {
+        mcp::serve(to_window, move || {
+            let _ = proxy.send_event(WinitUserEvent::WakeUp);
+        })
+    });
+    app.run();
+    Ok(())
+}
+
+/// A camera that clears the whole window, and one that draws the panels'
+/// frames and 2D content over everything.
+fn setup(mut commands: Commands, mut egui: ResMut<EguiGlobalSettings>) {
+    egui.auto_create_primary_context = false;
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
+            order: 0,
+            clear_color: ClearColorConfig::Custom(scene::BACKGROUND),
+            ..default()
+        },
+        bevy::camera::Hdr,
+        bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
+        Msaa::Off,
+        RenderLayers::none(),
+    ));
+    commands.spawn((
+        PrimaryEguiContext,
+        Camera2d,
+        // The default needs lookup tables this build leaves out; the panels
+        // are drawn in plain sRGB anyway.
+        bevy::core_pipeline::tonemapping::Tonemapping::None,
+        RenderLayers::none(),
+        Msaa::Off,
+        Camera {
+            order: 100,
+            output_mode: CameraOutputMode::Write {
+                blend_state: Some(BlendState::ALPHA_BLENDING),
+                clear_color: ClearColorConfig::None,
+            },
+            clear_color: ClearColorConfig::Custom(Color::NONE),
+            ..default()
+        },
+    ));
+}
+
+/// Hide the window when the user closes it: the agent may show more.
+fn hide_on_close(
+    mut closed: MessageReader<WindowCloseRequested>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+    mut stage: ResMut<Stage>,
+) {
+    if closed.read().count() > 0
+        && let Ok(mut window) = windows.single_mut()
+    {
+        window.visible = false;
+        stage.shown = false;
+    }
+}
+
+/// Run the loop flat out while the window is shown, and sleep while it is
+/// hidden: drawing a window nobody sees, as fast as the loop turns, kept
+/// whole cores busy for nothing.
+fn pace(stage: Res<Stage>, mut settings: ResMut<WinitSettings>) {
+    let wanted = if stage.shown {
+        WinitSettings::game()
+    } else {
+        asleep()
+    };
+    if settings.focused_mode != wanted.focused_mode
+        || settings.unfocused_mode != wanted.unfocused_mode
+    {
+        *settings = wanted;
+    }
+}
+
+/// Wait for an event, however long: a message from the agent, or the
+/// window shown again.
+fn asleep() -> WinitSettings {
+    let wait = UpdateMode::reactive_low_power(Duration::MAX);
+    WinitSettings {
+        focused_mode: wait,
+        unfocused_mode: wait,
+    }
+}
+
+/// Do every tool call that has arrived, then what the user asked of the
+/// window, and keep the story if it changed.
+fn bridge(world: &mut World) {
+    let calls: Vec<Message> = {
+        let inbox = world.resource::<Inbox>();
+        let Ok(rx) = inbox.0.lock() else { return };
+        rx.try_iter().collect()
+    };
+    for message in calls {
+        match message {
+            Message::Quit => {
+                world.write_message(AppExit::Success);
+            }
+            Message::Call(call) => match call.tool.as_str() {
+                "screenshot" => screenshot(world, call.reply),
+                _ => {
+                    let reply = match tools::handle(world, &call.tool, &call.args, Mode::Record) {
+                        Ok(text) => Reply::text(text),
+                        Err(e) => Reply::error(e),
+                    };
+                    let _ = call.reply.send(reply);
+                }
+            },
+        }
+    }
+    let (goto, open) = {
+        let mut stage = world.resource_mut::<Stage>();
+        (stage.goto.take(), stage.open.take())
+    };
+    if let Some(id) = open {
+        match Story::load(&id) {
+            Ok(story) => {
+                let title = story.title.clone();
+                {
+                    let mut stage = world.resource_mut::<Stage>();
+                    stage.story = Some(story);
+                    stage.step = 0;
+                }
+                tools::show_step(world, 0);
+                world.resource_mut::<Stage>().events.push(format!(
+                    "The user opened the story \"{title}\" ({id}) from the library."
+                ));
+            }
+            Err(e) => warn!("{e}"),
+        }
+    }
+    if let Some(n) = goto {
+        tools::show_step(world, n);
+        let mut stage = world.resource_mut::<Stage>();
+        let said = stage.story.as_ref().map(|s| {
+            format!(
+                "The user moved to step {} of {}, \"{}\".",
+                n + 1,
+                s.steps.len(),
+                s.steps.get(n).map_or("", |t| t.title.as_str())
+            )
+        });
+        if let Some(said) = said {
+            stage.events.push(said);
+        }
+    }
+    tools::save(world);
+    // The window says which story it tells.
+    let title = world
+        .resource::<Stage>()
+        .story
+        .as_ref()
+        .map_or("cellstage".to_owned(), |s| {
+            format!("cellstage · {}", s.title)
+        });
+    let mut windows = world.query_filtered::<&mut Window, With<PrimaryWindow>>();
+    if let Ok(mut window) = windows.single_mut(world)
+        && window.title != title
+    {
+        window.title = title;
+    }
+}
+
+/// A picture of the window, sent back as a PNG once the renderer has
+/// taken it.
+fn screenshot(world: &mut World, reply: Sender<Reply>) {
+    if !world.resource::<Stage>().shown {
+        let _ = reply.send(Reply::error(
+            "the window is not shown yet: show something first",
+        ));
+        return;
+    }
+    let reply = Mutex::new(Some(reply));
+    world
+        .spawn(Screenshot::primary_window())
+        .observe(move |captured: On<ScreenshotCaptured>| {
+            let Some(reply) = reply.lock().ok().and_then(|mut r| r.take()) else {
+                return;
+            };
+            let answer = match png(&captured.image) {
+                Ok(png) => Reply {
+                    text: "The window as it is now.".to_owned(),
+                    image: Some(png),
+                    error: false,
+                },
+                Err(e) => Reply::error(format!("could not encode the picture: {e}")),
+            };
+            let _ = reply.send(answer);
+        });
+}
+
+/// Pixels as a PNG, RGB or RGBA by `channels`.
+fn encode(pixels: &[u8], w: u32, h: u32, channels: usize) -> anyhow::Result<Vec<u8>> {
+    let mut out = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut out, w, h);
+        encoder.set_color(if channels == 4 {
+            png::ColorType::Rgba
+        } else {
+            png::ColorType::Rgb
+        });
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header()?;
+        writer.write_image_data(pixels)?;
+    }
+    Ok(out)
+}
+
+/// An image the renderer captured, as a PNG, halved if it is large.
+fn png(image: &Image) -> anyhow::Result<Vec<u8>> {
+    let (w, h) = (image.width() as usize, image.height() as usize);
+    let data = image
+        .data
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("no pixels"))?;
+    let bgra = matches!(
+        image.texture_descriptor.format,
+        TextureFormat::Bgra8UnormSrgb | TextureFormat::Bgra8Unorm
+    );
+    let halve = w > 1400;
+    let (ow, oh) = if halve { (w / 2, h / 2) } else { (w, h) };
+    let mut rgb = Vec::with_capacity(ow * oh * 3);
+    for y in 0..oh {
+        for x in 0..ow {
+            let mut sum = [0u32; 3];
+            let samples: &[(usize, usize)] = if halve {
+                &[(0, 0), (1, 0), (0, 1), (1, 1)]
+            } else {
+                &[(0, 0)]
+            };
+            for (dx, dy) in samples {
+                let (sx, sy) = if halve {
+                    (x * 2 + dx, y * 2 + dy)
+                } else {
+                    (x, y)
+                };
+                let i = (sy * w + sx) * 4;
+                let (r, g, b) = if bgra {
+                    (data[i + 2], data[i + 1], data[i])
+                } else {
+                    (data[i], data[i + 1], data[i + 2])
+                };
+                sum[0] += u32::from(r);
+                sum[1] += u32::from(g);
+                sum[2] += u32::from(b);
+            }
+            let n = samples.len() as u32;
+            rgb.extend_from_slice(&[(sum[0] / n) as u8, (sum[1] / n) as u8, (sum[2] / n) as u8]);
+        }
+    }
+    encode(&rgb, ow as u32, oh as u32, 3)
+}
+
+/// A black image of a size, kept on the CPU to be written into.
+pub fn blank(width: usize, height: usize) -> Image {
+    Image::new_fill(
+        Extent3d {
+            width: width as u32,
+            height: height as u32,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &[0, 0, 0, 255],
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+    )
+}
+
+/// The cells live: each running dish steps twice a second, and its picture
+/// is exposed again some fifteen times a second.
+fn live_cells(time: Res<Time>, mut views: ResMut<Views>, mut images: ResMut<Assets<Image>>) {
+    let dt = time.delta_secs();
+    for view in views.cells.values_mut() {
+        if view.running {
+            view.owed += dt * 2.0;
+            while view.owed >= 1.0 {
+                view.owed -= 1.0;
+                view.dish.step();
+            }
+        }
+        view.since += dt;
+        if view.since < 1.0 / 15.0 {
+            continue;
+        }
+        view.since = 0.0;
+        view.frame = view.frame.wrapping_add(1);
+        let levels = view.dish.levels();
+        let names = view.dish.names().to_vec();
+        let mut channels: Vec<Channel> = view
+            .stains
+            .iter()
+            .zip(DYES)
+            .filter_map(|(stain, colour)| {
+                let node = (*stain)?;
+                let level = *levels.get(node)? as f32;
+                Some(Channel {
+                    layers: specimen::pattern(&names[node], level),
+                    amount: level,
+                    colour,
+                    gain: 1.6,
+                })
+            })
+            .collect();
+        channels.push(Channel {
+            layers: specimen::dna_stain(),
+            amount: 1.0,
+            colour: specimen::BLUE,
+            gain: 0.5,
+        });
+        if let Some(mut image) = images.get_mut(&view.image)
+            && let Some(data) = image.data.as_mut()
+        {
+            view.specimen
+                .expose(&channels, view.dish.fate, view.frame, data);
+        }
+    }
+}
