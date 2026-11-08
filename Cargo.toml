@@ -13,7 +13,7 @@ cellweave-core   = { git = "https://github.com/ngodzik/cellweave", tag = "v0.3.0
 cellweave-engine = { git = "https://github.com/ngodzik/cellweave", tag = "v0.3.0", version = "0.3.0" }
 cellweave-io     = { git = "https://github.com/ngodzik/cellweave", tag = "v0.3.0", version = "0.3.0" }
 anyhow           = "1"
-base64           = "0.22"
+base64           = "0.23"
 png              = "0.18"
 rayon            = "1"
 serde            = { version = "1", features = ["derive"] }
