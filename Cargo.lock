@@ -1704,7 +1704,8 @@ dependencies = [
 
 [[package]]
 name = "cellweave-core"
-version = "0.2.0"
+version = "0.3.0"
+source = "git+https://github.com/ngodzik/cellweave?tag=v0.3.0#29391b77348f81a445ab3c5bc8731ca322941285"
 dependencies = [
  "serde",
  "thiserror 2.0.21",
@@ -1712,7 +1713,8 @@ dependencies = [
 
 [[package]]
 name = "cellweave-engine"
-version = "0.2.0"
+version = "0.3.0"
+source = "git+https://github.com/ngodzik/cellweave?tag=v0.3.0#29391b77348f81a445ab3c5bc8731ca322941285"
 dependencies = [
  "cellweave-core",
  "ndarray",
@@ -1724,7 +1726,8 @@ dependencies = [
 
 [[package]]
 name = "cellweave-io"
-version = "0.2.0"
+version = "0.3.0"
+source = "git+https://github.com/ngodzik/cellweave?tag=v0.3.0#29391b77348f81a445ab3c5bc8731ca322941285"
 dependencies = [
  "anyhow",
  "cellweave-core",

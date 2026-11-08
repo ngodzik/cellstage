@@ -41,10 +41,9 @@ Every panel carries a label, so that a drawing is never taken for a measurement 
 
 ## Running it
 
-It builds against cellweave's crates, so cellweave must sit next to it, at a revision that has the fuller cell of its chapter 28:
+It builds against cellweave's crates at version 0.3.0, the first with the fuller cell of its chapter 28, which Cargo fetches from GitHub:
 
 ```sh
-git clone https://github.com/ngodzik/cellweave.git
 git clone https://github.com/ngodzik/cellstage.git
 cd cellstage
 cargo build --release
