@@ -11,7 +11,6 @@ use cellweave_core::network::Term;
 use cellweave_core::{CellInputs, Concentration, NetworkSpec, SignalingNetwork, TimeStep};
 use cellweave_engine::Network;
 use cellweave_engine::simulation::{DEATH_THRESHOLD, QUIESCENCE_THRESHOLD};
-use cellweave_io::SimConfig;
 
 /// Units of network time per step of the dish: the engine's own, so a step
 /// here is a lattice step there.
@@ -109,15 +108,9 @@ pub struct Dish {
 
 impl Dish {
     /// A well-fed cell with every gene as it is, carrying the fuller cell
-    /// read from the repository's example.
+    /// that cellweave ships.
     pub fn new() -> anyhow::Result<Self> {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../cellweave/examples/spheroid-fuller.toml"
-        );
-        let config = SimConfig::from_file(path).map_err(|e| anyhow::anyhow!("{path}: {e}"))?;
-        let spec = config
-            .load_network(Some(path))
+        let spec = cellweave_io::shipped_network("fuller-cell")
             .map_err(|e| anyhow::anyhow!("the fuller cell: {e}"))?;
         let network = Network::from_spec(&spec, 200).map_err(|e| anyhow::anyhow!("{e}"))?;
         let switches = vec![Switch::Normal; spec.nodes.len()];
